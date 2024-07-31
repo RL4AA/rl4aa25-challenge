@@ -2,11 +2,22 @@
 
 Tutorial for the RL4AA'25 Workshop. Indico link to the event: [https://indico.scc.kit.edu/event/4216/]
 
-## Installation
+## Getting Started
+
+### Install dependencies
 
 In virtual environment, run `pip install -r requirements.txt`
 
 To-do (this can happen at the last stage before workshop): create a conda `environment.yml` file for better reproducibility, copy the instruction for last years here.
+
+### Run GP-MPC on ARES-EA
+
+Simply run `python -m src.run_gpmpc --config=config/config_ea.yaml`
+
+You can run experiments with different settings by creating a new config file.
+
+- `env` section handles how the ARES-EA is created and wrapped
+- the other sections defines the behavior of the GP-MPC controller
 
 ## Folder Structure
 
@@ -83,3 +94,14 @@ Will this work for a general cost function definition?
 - Does it still make sense to keep the magnet settings in the observation?
   - At least the prediction from (current magnet, action) → (next magnet) should be deterministic and not modeled by the GP?
   - Customize the GP model in forward? It should actually just model the magnet strength → beam, the transition probability can be derived form it?
+
+## Other Resources
+
+For GP-MPC running on AWAKE, please visit the RL4AA'24 tutorial
+
+- <https://github.com/RL4AA/rl4aa24-tutorial>
+
+For more examples and details on the ARES RL environment, c.f.
+
+- Paper: [Reinforcement learning-trained optimisers and Bayesian optimisation for online particle accelerator tuning](https://www.nature.com/articles/s41598-024-66263-y)
+- Code repository: <https://github.com/desy-ml/rl-vs-bo>
