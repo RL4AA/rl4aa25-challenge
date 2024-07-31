@@ -112,6 +112,6 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="config/config.yaml")
-
+    # To-do: Add an argument for saving the results
     args = parser.parse_args()
     main(args)

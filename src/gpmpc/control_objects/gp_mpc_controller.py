@@ -4,9 +4,6 @@ import time
 import gpytorch
 import numpy as np
 import torch
-
-# import torch.multiprocessing as mp
-# from scipy.optimize import basinhopping, minimize, shgo
 from scipy.optimize import minimize
 
 from src.gpmpc.utils.utils import create_models
