@@ -1,6 +1,6 @@
 black
 botorch
-git+https://github.com/desy-ml/cheetah.git  # TODO Replace when fixed
+cheetah-accelerator==0.6.3  # TODO Replace when fixed
 # git+ssh://git@gitlab.desy.de:msk-ipc/dummy-pydoocs.git
 # git+https://gitlab.desy.de/msk-ipc/dummy-pydoocs.git
 flake8

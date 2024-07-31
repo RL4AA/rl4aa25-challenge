@@ -14,8 +14,6 @@ FONTSIZE = 6
 MEAN_PRED_COST_INIT = 0
 STD_MEAN_PRED_COST_INIT = 1
 
-colors_map = plt.get_cmap("rainbow")(np.linspace(0, 1, 10))
-
 
 def create_models(
     train_inputs,
@@ -302,14 +300,15 @@ class LivePlotSequential:
         self.max_obs = obs_space.high
         self.min_action = action_space.low
         self.max_action = action_space.high
-
+        n_max = max(obs_space.shape[0], action_space.shape[0], 10)
+        self.plot_colors = plt.get_cmap("rainbow")(np.linspace(0, 1, n_max))
         self.num_points_show = 0
         self.lines_states = [
             self.axes[0].plot(
                 [],
                 [],
                 label="state" + str(state_idx),
-                color=colors_map[state_idx],  # cmap.colors[2 * state_idx]
+                color=self.plot_colors[state_idx],  # cmap.colors[2 * state_idx]
             )
             for state_idx in range(obs_space.shape[0])
         ]
@@ -320,7 +319,7 @@ class LivePlotSequential:
                 [],
                 [],
                 label="action" + str(action_idx),
-                color=colors_map[action_idx],
+                color=self.plot_colors[action_idx],
             )
             for action_idx in range(action_space.shape[0])
         ]
@@ -334,7 +333,7 @@ class LivePlotSequential:
                 [],
                 # [],
                 label="predicted_states" + str(state_idx),
-                color=colors_map[state_idx],
+                color=self.plot_colors[state_idx],
                 linestyle="dashed",
             )
             for state_idx in range(obs_space.shape[0])
@@ -344,7 +343,7 @@ class LivePlotSequential:
                 [],
                 [],
                 label="predicted_action" + str(action_idx),
-                color=colors_map[action_idx],
+                color=self.plot_colors[action_idx],
                 linestyle="dashed",
             )
             for action_idx in range(action_space.shape[0])
@@ -449,7 +448,7 @@ class LivePlotSequential:
                     idxs_future,
                     future_states_show - future_states_std_show * self.mul_std_bounds,
                     future_states_show + future_states_std_show * self.mul_std_bounds,
-                    facecolor=colors_map[idx_state],
+                    facecolor=self.plot_colors[idx_state],
                     alpha=ALPHA_CONFIDENCE_BOUNDS,
                     label="predicted "
                     + str(self.mul_std_bounds)

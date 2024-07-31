@@ -19,8 +19,10 @@ class RescaleObservation(gym.ObservationWrapper):
         self.observation_space = gym.spaces.Dict(
             {
                 key: gym.spaces.Box(
-                    low=min_observation if key != "beam" else -np.inf,
-                    high=max_observation if key != "beam" else np.inf,
+                    # low=min_observation if key != "beam" else -np.inf,
+                    # high=max_observation if key != "beam" else np.inf,
+                    low=min_observation,
+                    high=max_observation,
                     shape=space.shape,
                     dtype=space.dtype,
                 )

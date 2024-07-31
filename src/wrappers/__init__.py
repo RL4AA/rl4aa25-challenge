@@ -2,6 +2,7 @@ from .animate_incoming_beam import AnimateIncomingBeam  # noqa: F401
 from .ares_elog import ARESeLog  # noqa: F401
 from .bo_old_compatibility import BOOldCompatibility  # noqa: F401
 from .compensate_early_termination import CompensateEarlyTermination  # noqa: F401
+from .ea_mpc_episode_with_plotting import EAMpcEpisodeWithPlotting  # noqa: F401
 from .fail_q3 import FailQ3  # noqa: F401
 from .filter_action import FilterAction  # noqa: F401
 from .flatten_action import FlattenAction  # noqa: F401

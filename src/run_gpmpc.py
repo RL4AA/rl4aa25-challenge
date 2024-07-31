@@ -1,11 +1,27 @@
 import argparse
 import time
 
+import gymnasium as gym
 import yaml
+from gymnasium.wrappers import (
+    FlattenObservation,
+    FrameStack,
+    RecordVideo,
+    RescaleAction,
+    TimeLimit,
+)
+from stable_baselines3.common.monitor import Monitor
 
-from .gpmpc.awake import SmartEpisodeTrackerWithPlottingWrapper, e_trajectory_simENV
+from .environments import ea
 from .gpmpc.control_objects.gp_mpc_controller import GpMpcController
 from .gpmpc.utils.utils import close_run, init_control, init_visu_and_folders
+from .wrappers import (
+    EAMpcEpisodeWithPlotting,
+    LogTaskStatistics,
+    PlotEpisode,
+    PolishedDonkeyReward,
+    RescaleObservation,
+)
 
 
 def init_graphics_and_controller(env, num_steps, params_controller_dict):
@@ -30,7 +46,7 @@ def main(args):
     num_repeat_actions = params_controller_dict["controller"]["num_repeat_actions"]
     random_actions_init = params_controller_dict["random_actions_init"]
 
-    env = SmartEpisodeTrackerWithPlottingWrapper(e_trajectory_simENV())
+    env = make_env(config=params_controller_dict["env"])
     live_plot_obj, ctrl_obj = init_graphics_and_controller(
         env, num_steps, params_controller_dict
     )
@@ -109,9 +125,75 @@ def main(args):
         close_run(ctrl_obj=ctrl_obj, env=env)
 
 
+def make_env(
+    config: dict,
+    record_video: bool = False,
+    plot_episode: bool = False,
+    log_task_statistics: bool = False,
+) -> gym.Env:
+    env = ea.TransverseTuning(
+        backend="cheetah",
+        backend_args={
+            "incoming_mode": config["incoming_mode"],
+            "misalignment_mode": config["misalignment_mode"],
+            "max_misalignment": config["max_misalignment"],
+            "generate_screen_images": plot_episode,
+        },
+        action_mode=config["action_mode"],
+        magnet_init_mode=config["magnet_init_mode"],
+        max_quad_setting=config["max_quad_setting"],
+        max_quad_delta=config["max_quad_delta"],
+        max_steerer_delta=config["max_steerer_delta"],
+        target_beam_mode=config["target_beam_mode"],
+        target_threshold=config["target_threshold"],
+        threshold_hold=config["threshold_hold"],
+        clip_magnets=config["clip_magnets"],
+        beam_param_transform=config["beam_param_transform"],
+        beam_param_combiner=config["beam_param_combiner"],
+        beam_param_combiner_args=config["beam_param_combiner_args"],
+        beam_param_combiner_weights=config["beam_param_combiner_weights"],
+        magnet_change_transform=config["magnet_change_transform"],
+        magnet_change_combiner=config["magnet_change_combiner"],
+        magnet_change_combiner_args=config["magnet_change_combiner_args"],
+        magnet_change_combiner_weights=config["magnet_change_combiner_weights"],
+        final_combiner=config["final_combiner"],
+        final_combiner_args=config["final_combiner_args"],
+        final_combiner_weights=config["final_combiner_weights"],
+        render_mode="rgb_array",
+    )
+    env = TimeLimit(env, config["max_episode_steps"])
+    if plot_episode:
+        env = PlotEpisode(
+            env,
+            save_dir=f"plots/{config['run_name']}",
+            episode_trigger=lambda x: x % 5 == 0,  # Once per (5x) evaluation
+            log_to_wandb=True,
+        )
+    if log_task_statistics:
+        env = LogTaskStatistics(env)
+    if config["normalize_observation"] and not config["running_obs_norm"]:
+        env = RescaleObservation(env, -1, 1)
+    if config["rescale_action"]:
+        env = RescaleAction(env, -1, 1)
+    if config["polished_donkey_reward"]:
+        env = PolishedDonkeyReward(env)
+    env = FlattenObservation(env)
+    if config["frame_stack"] > 1:
+        env = FrameStack(env, config["frame_stack"])
+    env = Monitor(env)
+    if record_video:
+        env = RecordVideo(
+            env,
+            video_folder=f"recordings/{config['run_name']}",
+            episode_trigger=lambda x: x % 5 == 0,  # Once per (5x) evaluation
+        )
+    env = EAMpcEpisodeWithPlotting(env)
+    return env
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/config.yaml")
+    parser.add_argument("--config", type=str, default="config/config_ea.yaml")
     # To-do: Add an argument for saving the results
     args = parser.parse_args()
     main(args)

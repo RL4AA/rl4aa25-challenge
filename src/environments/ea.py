@@ -167,8 +167,10 @@ class TransverseTuning(gym.Env):
         self.observation_space = spaces.Dict(
             {
                 "beam": spaces.Box(
-                    low=np.array([-np.inf, 0, -np.inf, 0], dtype=np.float32),
-                    high=np.array([np.inf, np.inf, np.inf, np.inf], dtype=np.float32),
+                    # low=np.array([-np.inf, 0, -np.inf, 0], dtype=np.float32),
+                    # high=np.array([np.inf, np.inf, np.inf, np.inf], dtype=np.float32),
+                    low=np.array([-5e-3, 0, -5e-3, 0], dtype=np.float32),
+                    high=np.array([5e-3, 5e-3, 5e-3, 5e-3], dtype=np.float32),
                 ),
                 "magnets": self._magnet_space,
                 "target": spaces.Box(

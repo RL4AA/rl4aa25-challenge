@@ -1,0 +1,103 @@
+# General Parameters
+num_steps_env: 100 # Total interactions GP-MPC will have with the environment
+random_actions_init: 15 # Number of random actions to initialize the GP-MPC
+verbose: false
+
+env:
+  # Environment
+  action_mode: delta
+  max_quad_setting: 30.0
+  max_quad_delta: 30.0
+  max_steerer_delta: 6.1782e-3
+  magnet_init_mode: random
+  incoming_mode: random
+  misalignment_mode: random
+  max_misalignment: 5.0e-4
+  target_beam_mode: random
+  threshold_hold: 1
+  clip_magnets: true
+  # Reward (also environment)
+  beam_param_transform: ClippedLinear
+  beam_param_combiner: Mean
+  beam_param_combiner_args: {}
+  beam_param_combiner_weights: [1, 1, 1, 1]
+  magnet_change_transform: Sigmoid
+  magnet_change_combiner: Mean
+  magnet_change_combiner_args: {}
+  magnet_change_combiner_weights: [1, 1, 1, 1, 1]
+  final_combiner: Mean
+  final_combiner_args: {}
+  final_combiner_weights: [3, 0.5, 0.5]
+  # Wrappers
+  frame_stack: 1  # 1 means no frame stacking
+  normalize_observation: true
+  running_obs_norm: false
+  normalize_reward: false  # Not really needed because normalised by design
+  rescale_action: true
+  target_threshold: null  # 2e-5 m is estimated screen resolution
+  max_episode_steps: 100
+  polished_donkey_reward: false
+
+# Gaussian Process Initialization Parameters
+gp_init:
+  noise_covar.noise: [1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]
+  base_kernel.lengthscale: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+  outputscale: [0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15]
+
+# Gaussian Process Constraints
+gp_constraints:
+  min_std_noise: 1.0e-20
+  max_std_noise: 2.5e-2
+  min_outputscale: 1.0e-20
+  max_outputscale: 100.0
+  min_lengthscale: 1.0e-10
+  max_lengthscale: 1000.0
+  min_lengthscale_time: 0.01
+  max_lengthscale_time: 5.0
+
+# Controller Configuration
+controller:
+  # length equals to the length of the observation_space
+  # 4 current beam + 5 magnets + 4 target beam = 13
+  target_state_norm: [0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  weight_state: [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  weight_state_terminal: [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  obs_var_norm: [1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]
+  # length equals to the length of the action_space
+  target_action_norm: [0.5, 0.5, 0.5, 0.5, 0.5]
+  weight_action: [0.0, 0.0, 0.0, 0.0, 0.0]
+  len_horizon: 10
+  exploration_factor: 0.0
+  limit_action_change: false
+  max_change_action_norm: [0.5]
+  num_repeat_actions: 1
+  # avoid negative cost
+  clip_lower_bound_cost_to_0: false
+
+# Training Configuration of GP hyperparameters
+train:
+  lr_train: 1.0e-3
+  iter_train: 20
+  training_frequency: 1
+  clip_grad_value: 1.0e-4
+  print_train: false
+  step_print_train: 50
+
+# Action Optimizer Configuration
+actions_optimizer:
+  disp: null
+  maxcor: 15
+  ftol: 1.0e-10
+  gtol: 1.0e-15
+  eps: 1.0e-3
+  maxfun: 15
+  maxiter: 15
+  iprint: -1
+  maxls: 40
+  finite_diff_rel_step: null
+
+# Memory Configuration for reducing the amount of data in the buffer
+memory:
+  # length equals to the length of the observation_space
+  min_error_prediction_state_for_memory: [1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20]
+  min_prediction_state_std_for_memory: [1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20]
