@@ -1,0 +1,25 @@
+black
+botorch
+git+https://github.com/desy-ml/cheetah.git  # TODO Replace when fixed
+# git+ssh://git@gitlab.desy.de:msk-ipc/dummy-pydoocs.git
+# git+https://gitlab.desy.de/msk-ipc/dummy-pydoocs.git
+flake8
+gymnasium[other]
+ipympl
+ipywidgets
+isort
+jupyter
+matplotlib
+numpy
+git+https://github.com/jank324/ocelot.git
+opencv-python
+pytest
+rl_zoo3
+SciencePlots
+scipy
+seaborn
+stable-baselines3>=2.0
+tensorboard
+tqdm
+wandb
+xopt==2.0.0
