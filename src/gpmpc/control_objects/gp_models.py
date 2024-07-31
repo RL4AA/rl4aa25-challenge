@@ -9,8 +9,10 @@ class ExactGPModelMonoTask(gpytorch.models.ExactGP):
     - train_x (Tensor): Training input data.
     - train_y (Tensor): Training target data.
     - dim_input (int): Dimensionality of the input features.
-    - likelihood (gpytorch.likelihoods.Likelihood, optional): Gaussian likelihood function. Defaults to GaussianLikelihood.
-    - kernel (gpytorch.kernels.Kernel, optional): Covariance kernel. Defaults to RBFKernel with ARD.
+    - likelihood (gpytorch.likelihoods.Likelihood, optional):
+        Gaussian likelihood function. Defaults to GaussianLikelihood.
+    - kernel (gpytorch.kernels.Kernel, optional):
+        Covariance kernel. Defaults to RBFKernel with ARD.
     """
 
     def __init__(self, train_x, train_y, dim_input, likelihood=None, kernel=None):

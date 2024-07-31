@@ -124,11 +124,11 @@ class GpMpcController(BaseControllerObject):
         where lists containing values have been transformed into torch.Tensor
 
         Args:
-                params_dict (dict): contains all the parameters for the GP MPC controller,
-                        obtained from reading the json file. For more information, see parameters.md.
+            params_dict (dict): contains all the parameters for the GP MPC controller,
+            obtained from reading the json file.
 
         Returns:
-                params_dict (dict): dict parameters after the processing
+            params_dict (dict): dict parameters after the processing
         """
 
         params_dict["controller"]["target_state_norm"] = torch.Tensor(
@@ -146,20 +146,14 @@ class GpMpcController(BaseControllerObject):
         params_dict["controller"]["weight_action"] = torch.Tensor(
             params_dict["controller"]["weight_action"]
         )
-        # params_dict['constraints_states']['state_min'] = torch.Tensor(params_dict['constraints_states']['state_min'])
-        # params_dict['constraints_states']['state_max'] = torch.Tensor(params_dict['constraints_states']['state_max'])
+
+        # To-do: Why are the if-statements needed here?
         for key in params_dict["gp_init"]:
-            if (
-                type(params_dict["gp_init"][key]) != float
-                and type(params_dict["gp_init"][key]) != int
-            ):
+            if not isinstance(params_dict["gp_init"][key], (float, int)):
                 params_dict["gp_init"][key] = torch.Tensor(params_dict["gp_init"][key])
 
         for key in params_dict["gp_constraints"]:
-            if (
-                type(params_dict["gp_constraints"][key]) != float
-                and type(params_dict["gp_constraints"][key]) != int
-            ):
+            if not isinstance(params_dict["gp_constraints"][key], (float, int)):
                 params_dict["gp_constraints"][key] = torch.Tensor(
                     params_dict["gp_constraints"][key]
                 )
@@ -174,59 +168,12 @@ class GpMpcController(BaseControllerObject):
         params_dict["controller"]["obs_var_norm"] = torch.Tensor(
             params_dict["controller"]["obs_var_norm"]
         )
-
-        # if params_dict['controller']['include_time_gp']:
-        #     num_models = len(params_dict['controller']['target_state_norm'])
-        #     num_inputs = num_models + len(params_dict['controller']['target_action_norm']) + 1
-        #     max_lengthscale_time = params_dict['gp_constraints']['max_lengthscale_time']
-        #     min_lengthscale_time = params_dict['gp_constraints']['min_lengthscale_time']
-        #     init_lengthscale_time = min_lengthscale_time + (max_lengthscale_time - min_lengthscale_time) / 2
-        #
-        #     min_lengthscales = torch.empty((num_models, num_inputs))
-        #     if type(params_dict['gp_constraints']['min_lengthscale']) == float or \
-        #             type(params_dict['gp_constraints']['min_lengthscale']) == int or \
-        #             params_dict['gp_constraints']['min_lengthscale'].dim() != 1:
-        #         min_lengthscales[:, :-1] = params_dict['gp_constraints']['min_lengthscale']
-        #         min_lengthscales[:, -1] = min_lengthscale_time
-        #     else:
-        #         min_lengthscales[:, :-1] = params_dict['gp_constraints']['min_lengthscale'][None].t().repeat(
-        #             (1, num_inputs - 1))
-        #         min_lengthscales[:, -1] = min_lengthscale_time
-        #         min_lengthscales = min_lengthscales.detach().numpy()
-        #     params_dict['gp_constraints']['min_lengthscale'] = min_lengthscales
-        #
-        #     max_lengthscales = torch.empty((num_models, num_inputs))
-        #     if type(params_dict['gp_constraints']['max_lengthscale']) == float or \
-        #             type(params_dict['gp_constraints']['max_lengthscale']) == int or \
-        #             params_dict['gp_constraints']['max_lengthscale'].dim() != 1:
-        #         max_lengthscales[:, :-1] = params_dict['gp_constraints']['max_lengthscale']
-        #         max_lengthscales[:, -1] = max_lengthscale_time
-        #     else:
-        #         max_lengthscales[:, :-1] = params_dict['gp_constraints']['max_lengthscale'][None].t().repeat(
-        #             (1, num_inputs - 1))
-        #         max_lengthscales[:, -1] = max_lengthscale_time
-        #         max_lengthscales = max_lengthscales.detach().numpy()
-        #     params_dict['gp_constraints']['max_lengthscale'] = max_lengthscales
-        #     # if params_dict['gp_init'] is values exported from already defined gps,
-        #     # there is no need to add dim for time
-        #     if type(params_dict['gp_init']) == dict:
-        #         lengthscales = torch.empty((num_models, num_inputs))
-        #         if type(params_dict['gp_init']['base_kernel.lengthscale']) == float or \
-        #                 type(params_dict['gp_init']['base_kernel.lengthscale']) == int or \
-        #                 params_dict['gp_init']['base_kernel.lengthscale'].dim() != 1:
-        #             lengthscales[:, :-1] = params_dict['gp_init']['base_kernel.lengthscale']
-        #             lengthscales[:, -1] = init_lengthscale_time
-        #         else:
-        #             lengthscales[:, :-1] = params_dict['gp_init']['base_kernel.lengthscale'][None].t().repeat(
-        #                 (1, num_inputs - 1))
-        #             lengthscales[:, -1] = init_lengthscale_time
-        #             lengthscales = lengthscales.detach().numpy()
-        #         params_dict['gp_init']['base_kernel.lengthscale'] = lengthscales
         return params_dict
 
     def to_normed_obs_tensor(self, obs):
         """
-        Compute the norm of observation using the min and max of the observation_space of the gym env.
+        Compute the norm of observation using the min and max of the observation_space
+        of the gym env.
 
         Args:
                 obs  (numpy.array): observation from the gym environment. dim=(Ns,)
@@ -258,11 +205,12 @@ class GpMpcController(BaseControllerObject):
 
     def to_normed_action_tensor(self, action):
         """
-        Compute the norm of the action using the min and max of the action_space of the gym env.
+        Compute the norm of the action using the min and max of the action_space of the
+        gym env.
 
         Args:
-                action  (numpy.array): un-normalized action. dim=(Na,)
-                                                                Na: dimension of action_space
+                action (numpy.array): un-normalized action. dim=(Na,)
+                    Na: dimension of action_space
         Returns:
                 action_norm (torch.Tensor): normed action
 
@@ -275,15 +223,15 @@ class GpMpcController(BaseControllerObject):
 
     def denorm_action(self, action_norm):
         """
-        Denormalize the action using the min and max of the action_space of the gym env, so that
-        it can be apllied on the gym env
+        Denormalize the action using the min and max of the action_space of the gym
+        env, so that it can be apllied on the gym env
 
         Args:
-                action_norm  (numpy.array or torch.Tensor): normed action. dim=(Na,)
-                                                                                                Na: dimension of action_space
+            action_norm  (numpy.array or torch.Tensor): normed action. dim=(Na,)
+            Na: dimension of action_space
         Returns:
-                action (numpy_array or torch.Tensor): un-normalised action. dim=(Na,)
-                                                                                                        Na: dimension of action_space
+            action (numpy_array or torch.Tensor): un-normalised action. dim=(Na,)
+            Na: dimension of action_space
         """
         action = (
             action_norm * (self.action_space.high - self.action_space.low)
@@ -293,28 +241,31 @@ class GpMpcController(BaseControllerObject):
 
     def compute_cost(self, state_mu, state_var, action):
         """
-        Compute the quadratic cost of one state distribution or a trajectory of states distributions
-        given the mean value and variance of states (observations), the weight matrix, and target state.
+        Compute the quadratic cost of one state distribution or a trajectory of states
+        distributions given the mean value and variance of states (observations), the
+        weight matrix, and target state.
         The state, state_var and action must be normalized.
         If reading directly from the gym env observation,
         this can be done with the gym env action space and observation space.
         See an example of normalization in the add_points_memory function.
         Args:
-                state_mu (torch.Tensor): normed mean value of the state or observation distribution
-                                                                (elements between 0 and 1). dim=(Ns) or dim=(Np, Ns)
-                state_var (torch.Tensor): normed variance matrix of the state or observation distribution
-                                                                        (elements between 0 and 1)
-                                                                        dim=(Ns, Ns) or dim=(Np, Ns, Ns)
-                action (torch.Tensor): normed actions. (elements between 0 and 1).
-                                                                dim=(Na) or dim=(Np, Na)
+            state_mu (torch.Tensor): normed mean value of the state or observation
+                distribution (elements between 0 and 1). dim=(Ns) or dim=(Np, Ns)
+            state_var (torch.Tensor): normed variance matrix of the state or
+            observation distribution (elements between 0 and 1)
+                dim=(Ns, Ns) or dim=(Np, Ns, Ns)
+            action (torch.Tensor): normed actions. (elements between 0 and 1).
+                dim=(Na) or dim=(Np, Na)
 
-                Np: length of the prediction trajectory. (=self.len_horizon)
-                Na: dimension of the gym environment actions
-                Ns: dimension of the gym environment states
+            Np: length of the prediction trajectory. (=self.len_horizon)
+            Na: dimension of the gym environment actions
+            Ns: dimension of the gym environment states
 
         Returns:
-                cost_mu (torch.Tensor): mean value of the cost distribution. dim=(1) or dim=(Np)
-                cost_var (torch.Tensor): variance of the cost distribution. dim=(1) or dim=(Np)
+            cost_mu (torch.Tensor): mean value of the cost distribution.
+                dim=(1) or dim=(Np)
+            cost_var (torch.Tensor): variance of the cost distribution.
+                dim=(1) or dim=(Np)
         """
 
         if state_var.ndim == 3:
@@ -375,12 +326,14 @@ class GpMpcController(BaseControllerObject):
         """
         Compute the terminal cost of the prediction trajectory.
         Args:
-                state_mu (torch.Tensor): mean value of the terminal state distribution. dim=(Ns)
-                state_var (torch.Tensor): variance matrix of the terminal state distribution. dim=(Ns, Ns)
+            state_mu (torch.Tensor): mean value of the terminal state distribution.
+                dim=(Ns)
+            state_var (torch.Tensor): variance matrix of the terminal state
+                distribution. dim=(Ns, Ns)
 
         Returns:
-                cost_mu (torch.Tensor): mean value of the cost distribution. dim=(1)
-                cost_var (torch.Tensor): variance of the cost distribution. dim=(1)
+            cost_mu (torch.Tensor): mean value of the cost distribution. dim=(1)
+            cost_var (torch.Tensor): variance of the cost distribution. dim=(1)
         """
         error = state_mu - self.target_state_norm
         cost_mu = torch.trace(
@@ -400,14 +353,15 @@ class GpMpcController(BaseControllerObject):
         Takes in numpy array and returns numpy array.
         Meant to be used to compute the cost outside the object.
         Args:
-                obs (numpy.array): state (or observation). shape=(Ns,)
-                action (numpy.array): action. Shape=(Na,)
-                obs_var (numpy.array): state (or observation) variance. Default=None. shape=(Ns, Ns)
-                                                                If set to None, the observation constant stored inside the object will be used
+            obs (numpy.array): state (or observation). shape=(Ns,)
+            action (numpy.array): action. Shape=(Na,)
+            obs_var (numpy.array): state (or observation) variance.
+                Default=None. shape=(Ns, Ns) If set to None, the
+                observation constant stored inside the object will be used
 
         Returns:
-                cost_mu (float): Mean of the cost
-                cost_var (float): variance of the cost
+            cost_mu (float): Mean of the cost
+            cost_var (float): variance of the cost
         """
         obs_norm = self.to_normed_obs_tensor(obs)
         action_norm = self.to_normed_action_tensor(action)
@@ -421,28 +375,35 @@ class GpMpcController(BaseControllerObject):
     @staticmethod
     def calculate_factorizations(x, y, models):
         """
-        Compute iK and beta using the points in memory, which are needed to make predictions with the gaussian processes.
-        These two variables only depends on data in memory, and not on input distribution,
-        so they separated from other computation such that they can be computed outside the optimisation function,
-        which is computed multiple times at each iteration
+        Compute iK and beta using the points in memory, which are needed to make
+        predictions with the gaussian processes.
+        These two variables only depends on data in memory, and not on input
+        distribution, so they separated from other computation such that they can be
+        computed outside the optimisation function, which is computed multiple times
+        at each iteration
 
         Function inspired from
         https://github.com/nrontsis/PILCO/blob/6a962c8e4172f9e7f29ed6e373c4be2dd4b69cb7/pilco/models/mgpr.py#L81,
         reimplemented from tensorflow to pytorch
         Args:
-                x (torch.Tensor): matrix containing the states and actions. Dim=(Nm, Ns + Na)
-                y (torch.Tensor): matrix containing the states change. Dim=(Nm, Ns)
-                models (list of gpytorch.models.ExactGP): list containing the gp models used to predict each state change.
-                                                                                                        Len=Ns
-                Ns: number of states
-                Na: number of actions
-                Nm: number of points in memory
+            x (torch.Tensor): matrix containing the states and actions.
+                Dim=(Nm, Ns + Na)
+            y (torch.Tensor): matrix containing the states change.
+                Dim=(Nm, Ns)
+            models (list of gpytorch.models.ExactGP): list containing the gp models
+                used to predict each state change.
+            Len=Ns
+            Ns: number of states
+            Na: number of actions
+            Nm: number of points in memory
 
         Returns:
-                iK (torch.Tensor): needed by the gaussian processes models to compute the predictions
-                beta (torch.Tensor): needed by the gaussian processes models to compute the predictions
-
+            iK (torch.Tensor): needed by the gaussian processes models to compute the
+                predictions
+            beta (torch.Tensor): needed by the gaussian processes models to compute the
+                predictions
         """
+
         K = torch.stack([model.covar_module(x).evaluate() for model in models])
         batched_eye = torch.eye(K.shape[1]).repeat(K.shape[0], 1, 1)
         L = torch.linalg.cholesky(
@@ -459,23 +420,30 @@ class GpMpcController(BaseControllerObject):
         """
         Approximate GP regression at noisy inputs via moment matching
         IN: mean (m) (row vector) and (s) variance of the state
-        OUT: mean (M) (row vector), variance (S) of the action and inv(s)*input-ouputcovariance
+        OUT: mean (M) (row vector), variance (S) of the action and
+            inv(s)*input-ouputcovariance
+
         Function inspired from
         https://github.com/nrontsis/PILCO/blob/6a962c8e4172f9e7f29ed6e373c4be2dd4b69cb7/pilco/models/mgpr.py#L81,
         reinterpreted from tensorflow to pytorch
-        Args:
-                state_mu (torch.Tensor): mean value of the input distribution. Dim=(Ns + Na,)
 
-                state_var (torch.Tensor): covariance matrix of the input distribution. Dim=(Ns + Na, Ns + Na)
+        Args:
+            state_mu (torch.Tensor): mean value of the input distribution.
+                Dim=(Ns + Na,)
+
+            state_var (torch.Tensor): covariance matrix of the input distribution.
+                Dim=(Ns + Na, Ns + Na)
 
         Returns:
-                M.t() (torch.Tensor): mean value of the predicted change distribution. Dim=(Ns,)
+            M.t() (torch.Tensor): mean value of the predicted change distribution.
+                Dim=(Ns,)
 
-                S (torch.Tensor): covariance matrix of the predicted change distribution. Dim=(Ns, Ns)
+            S (torch.Tensor): covariance matrix of the predicted change distribution.
+                Dim=(Ns, Ns)
 
-                V.t() (torch.Tensor): Dim=(Ns, Ns + Na)
+            V.t() (torch.Tensor): Dim=(Ns, Ns + Na)
 
-                where Ns: dimension of state, Na: dimension of action
+            where Ns: dimension of state, Na: dimension of action
         """
         state_var = state_var[None, None, :, :].repeat(
             [self.num_states, self.num_states, 1, 1]
@@ -550,49 +518,56 @@ class GpMpcController(BaseControllerObject):
 
     def predict_trajectory(self, actions, obs_mu, obs_var, iK, beta):
         """
-        Compute the future predicted states distribution for the simulated trajectory given the
-        current initial state (or observation) distribution (obs_mu and obs_var) and planned actions
-        It also returns the costs, the variance of the costs, and the lower confidence bound of the cost
-        along the trajectory
+        Compute the future predicted states distribution for the simulated trajectory
+        given the current initial state (or observation) distribution
+        (obs_mu and obs_var) and planned actions It also returns the costs, the
+        variance of the costs, and the lower confidence bound of the cost along the
+        trajectory
 
         Args:
-                actions (torch.Tensor): actions to apply for the simulated trajectory. dim=(Nh, Na)
-                                                                where Nh is the len of the horizon and Na the dimension of actions
+            actions (torch.Tensor): actions to apply for the simulated trajectory.
+                dim=(Nh, Na)
+                where Nh is the len of the horizon and Na the dimension of actions
 
-                obs_mu (torch.Tensor):	mean value of the inital state distribution.
-                                                                dim=(Ns,) where Ns is the dimension of state
+            obs_mu (torch.Tensor):	mean value of the inital state distribution.
+                dim=(Ns,) where Ns is the dimension of state
 
-                obs_var (torch.Tensor): variance matrix of the inital state distribution.
-                                                                dim=(Ns, Ns) where Ns is the dimension of state
+            obs_var (torch.Tensor): variance matrix of the inital state distribution.
+                dim=(Ns, Ns) where Ns is the dimension of state
 
-                iK (torch.Tensor): intermediary result for the gp predictions that only depends on the points in memory
-                                                        and not on the points to predict.
-                                                        It is computed outside the optimization function in self.calculate_factorizations
-                                                        for more efficient predictions. Dim=(Ns, Np, Np)
-                                                        where Ns is the dimension of state and Np the number of points in gp memory
+            iK (torch.Tensor): intermediary result for the gp predictions that only
+                depends on the points in memory and not on the points to predict.
+                It is computed outside the optimization function in
+                `self.calculate_factorizations` for more efficient predictions.
+                Dim=(Ns, Np, Np) where Ns is the dimension of state and Np the number
+                of points in gp memory
 
-                beta (torch.Tensor): intermediary result for the gp predictions that only depends on the points in memory
-                                                        and not on the points to predict.
-                                                        It is computed outside the optimization function in self.calculate_factorizations
-                                                        for more efficient predictions. Dim=(Ns, Np)
+            beta (torch.Tensor): intermediary result for the gp predictions that only
+                depends on the points in memory and not on the points to predict.
+                It is computed outside the optimization function in
+                `self.calculate_factorizations` for more efficient predictions.
+                Dim=(Ns, Np)
 
         Returns:
-                states_mu_pred (torch.Tensor): predicted states of the trajectory.
-                                                                                The first element contains the initial state.
-                                                                                Dim=(Nh + 1, Ns)
+            states_mu_pred (torch.Tensor): predicted states of the trajectory.
+            The first element contains the initial state. Dim=(Nh + 1, Ns)
 
-                states_var_pred (torch.Tensor): covariance matrix of the predicted states of the trajectory.
-                                                                                The first element contains the initial state.
-                                                                                Dim=(Nh + 1, Ns, Ns)
+            states_var_pred (torch.Tensor): covariance matrix of the predicted
+            states of the trajectory. The first element contains the initial state.
+            Dim=(Nh + 1, Ns, Ns)
 
-                costs_traj (torch.Tensor): costs of the predicted trajectory. Dim=(Nh,)
+            costs_traj (torch.Tensor): costs of the predicted trajectory. Dim=(Nh,)
 
-                costs_traj_var (torch.Tensor): variance of the costs of the predicted trajectory. Dim=(Nh,)
+            costs_traj_var (torch.Tensor): variance of the costs of the predicted
+                trajectory. Dim=(Nh,)
 
-                costs_traj_lcb (torch.Tensor): lower confidence bound of the costs of the predicted trajectory.
-                                                                                                Dim=(Nh,)
+            costs_traj_lcb (torch.Tensor): lower confidence bound of the costs of the
+                predicted trajectory. Dim=(Nh,)
 
-                where Nh: horizon length, Ns: dimension of states, Na: dimension of actions, Np:number of points in gp memory
+                - Nh: horizon length,
+                - Ns: dimension of states,
+                - Na: dimension of actions,
+                - Np: number of points in gp memory
         """
         states_mu_pred = torch.empty((self.len_horizon + 1, len(obs_mu)))
         states_var_pred = torch.empty(
@@ -601,7 +576,8 @@ class GpMpcController(BaseControllerObject):
         states_mu_pred[0] = obs_mu
         states_var_pred[0] = obs_var
         state_dim = obs_mu.shape[0]
-        # Input of predict_next_state_change is not a state, but the concatenation of state and action
+        # Input of predict_next_state_change is not a state, but the concatenation of
+        # state and action
         for idx_time in range(1, self.len_horizon + 1):
             input_var = torch.zeros((self.num_inputs, self.num_inputs))
             input_var[:state_dim, :state_dim] = states_var_pred[idx_time - 1]
@@ -635,7 +611,6 @@ class GpMpcController(BaseControllerObject):
         costs_traj_lcb = costs_traj - self.exploration_factor * torch.sqrt(
             costs_traj_var
         )
-        # print('res:', costs_traj, self.exploration_factor * torch.sqrt(costs_traj_var))
         return (
             states_mu_pred,
             states_var_pred,
@@ -646,56 +621,60 @@ class GpMpcController(BaseControllerObject):
 
     def compute_mean_lcb_trajectory(self, actions, obs_mu, obs_var, iK, beta):
         """
-        Compute the mean lower bound cost of a trajectory given the actions of the trajectory
-        and initial state distribution. The gaussian process models are used to predict the evolution of
-        states (mean and variance). Then the cost is computed for each predicted state and the mean is returned.
-        The partial derivatives of the mean lower bound cost with respect to the actions are also returned.
+        Compute the mean lower bound cost of a trajectory given the actions of the
+        trajectory and initial state distribution.
+        The gaussian process models are used to predict the evolution of states
+        (mean and variance). Then the cost is computed for each predicted state and the
+        mean is returned. The partial derivatives of the mean lower bound cost with
+        respect to the actions are also returned.
         They are computed automatically with autograd from pytorch.
-        This function is called multiple times by an optimizer to find the optimal actions.
+        This function is called multiple times by an optimizer to find the optimal
+        actions.
 
         Args:
-                actions (numpy.array): actions to apply for the simulated trajectory.
-                                                                It is a flat 1d array, whatever the dimension of actions
-                                                                so that this function can be used by the minimize function of the scipy library.
-                                                                It is reshaped and transformed into a tensor inside.
-                                                                If self.limit_action_change is true, each element of the array contains the relative
-                                                                change with respect to the previous iteration, so that the change can be bounded by
-                                                                the optimizer. dim=(Nh x Na,)
-                                                                where Nh is the len of the horizon and Na the dimension of actions
+            actions (numpy.array): actions to apply for the simulated trajectory.
+            It is a flat 1d array, whatever the dimension of actions so that this
+            function can be used by the minimize function of the scipy library.
+            It is reshaped and transformed into a tensor inside.
+            If self.limit_action_change is true, each element of the array contains the
+            relative change with respect to the previous iteration, so that the change
+            can be bounded by the optimizer. dim=(Nh x Na,) where Nh is the length of
+            the horizon and Na the dimension of actions
 
-                obs_mu (torch.Tensor):	mean value of the inital state distribution.
-                                                                dim=(Ns,) where Ns is the dimension of state
+            obs_mu (torch.Tensor):	mean value of the inital state distribution.
+                dim=(Ns,) where Ns is the dimension of state
 
-                obs_var (torch.Tensor): covariance matrix of the inital state distribution.
-                                                                dim=(Ns, Ns) where Ns is the dimension of state
+            obs_var (torch.Tensor): covariance matrix of the inital state distribution.
+                dim=(Ns, Ns) where Ns is the dimension of state
 
-                iK (torch.Tensor): intermediary result for the gp predictions that only depends on the points in memory
-                                                        and not on the points to predict.
-                                                        It is computed outside the optimization function in self.calculate_factorizations
-                                                        for more efficient predictions. Dim=(Ns, Np, Np)
-                                                        where Ns is the dimension of state and Np the number of points in gp memory
+            iK (torch.Tensor): intermediary result for the gp predictions that only
+                depends on the points in memory and not on the points to predict.
+                It is computed outside the optimization function in
+                `self.calculate_factorizations` for more efficient predictions.
+                Dim=(Ns, Np, Np) where Ns is the dimension of state and Np the
+                number of points in gp memory
 
-                beta (torch.Tensor): intermediary result for the gp predictions that only depends on the points in memory
-                                                        and not on the points to predict.
-                                                        It is computed outside the optimization function in self.calculate_factorizations
-                                                        for more efficient predictions. Dim=(Ns, Np)
+            beta (torch.Tensor): intermediary result for the gp predictions that
+                only depends on the points in memory and not on the points to predict.
+                It is computed outside the optimization function in
+                `self.calculate_factorizations` for more efficient predictions.
+                Dim=(Ns, Np)
 
         Returns:
-                mean_cost_traj_lcb.item() (float): lower bound of the mean cost distribution
-                                                                                                        of the predicted trajectory.
+            mean_cost_traj_lcb.item() (float): lower bound of the mean cost
+            distribution of the predicted trajectory.
 
-
-                gradients_dcost_dactions[:, 0].detach().numpy() (numpy.array):
-                                                                                                                        Derivative of the lower bound of the mean cost
-                                                                                                                        distribution with respect to each of the actions in the
-                                                                                                                        prediction horizon. Dim=(Nh,)
-                                                                                                                        where Nh is the len of the horizon
+            gradients_dcost_dactions[:, 0].detach().numpy() (numpy.array):
+                Derivative of the lower bound of the mean cost distribution with
+                respect to each of the actions in the prediction horizon. Dim=(Nh,)
+                where Nh is the len of the horizon
         """
         # reshape actions from flat 1d numpy array into 2d tensor
         actions = np.atleast_2d(actions.reshape(self.len_horizon, -1))
         actions = torch.Tensor(actions)
         actions.requires_grad = True
-        # If limit_action_change is true, actions are transformed back into absolute values from relative change
+        # If limit_action_change is true, actions are transformed back into
+        # absolute values from relative change
         if self.limit_action_change:
             actions_input = actions.clone()
             actions_input[0] = self.action_previous_iter + actions_input[0]
@@ -726,46 +705,57 @@ class GpMpcController(BaseControllerObject):
     def compute_action(self, obs_mu, obs_var=None):
         """
         Get the optimal action given the observation by optimizing
-        the actions of the simulated trajectory with the gaussian process models such that the lower confidence bound of
-        the mean cost of the trajectory is minimized.
+        the actions of the simulated trajectory with the gaussian process models
+        such that the lower confidence bound of the mean cost of the trajectory
+        is minimized.
         Only the first action of the prediction window is returned.
 
         Args:
-                obs_mu (numpy.array): unnormalized observation from the gym environment. dim=(Ns)
-                obs_var (numpy.array): unnormalized variance of the observation from the gym environment. dim=(Ns, Ns).
-                                                                default=None. If it is set to None,
-                                                                the observation noise from the json parameters will be used for every iteration.
-                                                                Ns is the dimension of states in the gym environment.
+                obs_mu (numpy.array): unnormalized observation from the gym environment.
+                    dim=(Ns)
+                obs_var (numpy.array): unnormalized variance of the observation from
+                    the gym environment. dim=(Ns, Ns).
+                    default=None. If it is set to None, the observation noise from the
+                    json parameters will be used for every iteration. Ns is the
+                    dimension of states in the gym environment.
 
         Returns:
                 action_denorm (numpy.array): action to use in the gym environment.
-                                                                        It is denormalized, so it can be used directly.
-                                                                        dim=(Na), where Ns is the dimension of the action_space
-                info_dict (dict): contains all additional information about the iteration.
-                                                Keys:
-                                                - iteration (int): index number of the iteration
-                                                - state (torch.Tensor): current normed state (before applying the action)
-                                                - predicted states (torch.Tensor): mean value of the predicted distribution of the
-                                                                                                                        normed states in the mpc
-                                                - predicted states std (torch.Tensor): predicted normed standard deviation of the
-                                                                                                                                distribution of the states in the mpc
-                                                - predicted actions (torch.Tensor): predicted optimal normed actions that minimize
-                                                                                                                        the long term cost in the mpc
-                                                cost (float): mean value of the current cost distribution
-                                                cost std (float): standard deviation of the current cost distribution
-                                                predicted costs (torch.Tensor): mean value of the predicted cost distribution in the mpc
-                                                predicted costs std (torch.Tensor): standard deviation of the
-                                                                                                                        predicted cost distribution in the mpc
-                                                mean predicted cost (float): mean value of the predicted cost distribution in the mpc,
-                                                                                                                        averaged over future predicted time steps
-                                                mean predicted cost std (float): standard deviation of the predicted cost distribution in the mpc,
-                                                                                                                        averaged over future predicted time steps
-                                                lower bound mean predicted cost (float): lower bound of the predicted cost distribution
-                                                                                        (cost_mean_future_mean - self.exploration_factor * cost_std_future_mean).
-                                                                                        It is the value minimized by the mpc.
+                    It is denormalized, so it can be used directly. dim=(Na), where
+                    Ns is the dimension of the action_space
+                info_dict (dict):
+                    contains all additional information about the iteration.
+                    Keys:
+                    - iteration (int): index number of the iteration
+                    - state (torch.Tensor): current normed state
+                        (before applying the action)
+                    - predicted states (torch.Tensor): mean value of the predicted
+                        distribution of the normed states in the mpc
+                    - predicted states std (torch.Tensor): predicted normed standard
+                        deviation of the distribution of the states in the mpc
+                    - predicted actions (torch.Tensor): predicted optimal normed
+                        actions that minimize the long term cost in the mpc
+                    cost (float): mean value of the current cost distribution
+                    cost std (float): standard deviation of the current cost
+                        distribution
+                    predicted costs (torch.Tensor): mean value of the predicted cost
+                        distribution in the mpc
+                    predicted costs std (torch.Tensor): standard deviation of the
+                        predicted cost distribution in the mpc
+                    mean predicted cost (float): mean value of the predicted cost
+                        distribution in the mpc, averaged over future predicted time
+                        steps
+                    mean predicted cost std (float): standard deviation of the
+                        predicted cost distribution in the mpc, averaged over future
+                        predicted time steps
+                    lower bound mean predicted cost (float): lower bound of the
+                        predicted cost distribution  (cost_mean_future_mean -
+                        self.exploration_factor * cost_std_future_mean).
+                        It is the value minimized by the mpc.
 
         """
-        # Check for parallel process that are open but not alive at each iteration to retrieve the results and close them
+        # Check for parallel process that are open but not alive at each iteration
+        # to retrieve the results and close them
         self.check_and_close_processes()
         torch.set_num_threads(self.num_cores_main)
 
@@ -775,17 +765,21 @@ class GpMpcController(BaseControllerObject):
                 obs_var_norm = self.obs_var_norm
             else:
                 obs_var_norm = self.to_normed_var_tensor(obs_var=obs_var)
-            # iK and beta are computed outside of the optimization function since it depends only on the points in memory,
-            # and not on the input. Otherwise, the optimization time at each iteration would be too high
+            # iK and beta are computed outside of the optimization function since
+            # it depends only on the points in memory,
+            # and not on the input. Otherwise, the optimization time at each
+            # iteration would be too high
 
             self.iK, self.beta = self.calculate_factorizations(
                 self.x[self.idxs_mem_gp], self.y[self.idxs_mem_gp], self.models
             )
-            # The initial actions_norm values are fixed using the actions_norm predictions of the mpc of the previous iteration,
-            # offset by 1, so that the initial values have a correct guess, which allows to get good results
-            # by using only 1 to 3 iteration of the action optimizer at each iteration.
-            # The value of the last init value of action in the prediction window is set as the same as
-            # the last of the prevous iteration.
+            # The initial actions_norm values are fixed using the actions_norm
+            # predictions of the mpc of the previous iteration,
+            # offset by 1, so that the initial values have a correct guess, which
+            # allows to get good results by using only 1 to 3 iteration of the action
+            # optimizer at each iteration.
+            # The value of the last init value of action in the prediction window is
+            # set as the same as the last of the prevous iteration.
             init_actions_optim = np.concatenate(
                 (
                     self.actions_pred_previous_iter[1:],
@@ -793,11 +787,13 @@ class GpMpcController(BaseControllerObject):
                 ),
                 axis=0,
             )
-            # See comment in __init__ above the definition of bounds for more information about limit_action change trick
+            # See comment in __init__ above the definition of bounds for more
+            # information about limit_action change trick
             # Actions in the minimize function fo scipy must be a 1d vector.
-            # If the action is multidimensional, it is resized to a 1d array and passed into the minimize function as
-            # a 1d array. The init values and bounds must match the dimension of the passed array.
-            # It is reshaped inside the minimize function to get back the true dimensions
+            # If the action is multidimensional, it is resized to a 1d array and passed
+            # into the minimize function as a 1d array. The init values and bounds must
+            # match the dimension of the passed array. It is reshaped inside the
+            # minimize function to get back the true dimensions
             if self.limit_action_change:
                 init_actions_optim_absolute = np.empty_like(init_actions_optim)
                 init_actions_optim_absolute[0] = self.action_previous_iter
@@ -834,7 +830,8 @@ class GpMpcController(BaseControllerObject):
         # The optimize function from the scipy library.
         # It is used to get the optimal actions_norm in the prediction window
         # that minimizes the lower bound of the predicted cost. The jacobian is used,
-        # otherwise the computation times would be 5 to 10x slower (for the tests I used)
+        # otherwise the computation times would be 5 to 10x slower
+        # (for the tests I used)
         time_start_optim = time.time()
         res = minimize(
             fun=self.compute_mean_lcb_trajectory,
@@ -872,8 +869,10 @@ class GpMpcController(BaseControllerObject):
                 obs_mu_normed, obs_var_norm, actions_norm[0]
             )
             # states_denorm = self.states_mu_pred[1:] * \
-            # (self.observation_space.high - self.observation_space.low) + self.observation_space.low
-            # states_std_denorm = states_std_pred * (self.observation_space.high - self.observation_space.low)
+            # (self.observation_space.high - self.observation_space.low) + \
+            # self.observation_space.low
+            # states_std_denorm = states_std_pred * \
+            # (self.observation_space.high - self.observation_space.low)
             states_std_pred = torch.diagonal(
                 self.states_var_pred, dim1=-2, dim2=-1
             ).sqrt()
@@ -894,7 +893,7 @@ class GpMpcController(BaseControllerObject):
                 "lower bound mean predicted cost": self.cost_traj_mean_lcb.item(),
             }
             for key in info_dict.keys():
-                if not key in self.info_iters:
+                if key not in self.info_iters:
                     self.info_iters[key] = [info_dict[key]]
                 else:
                     self.info_iters[key].append(info_dict[key])
@@ -912,31 +911,33 @@ class GpMpcController(BaseControllerObject):
         predicted_state_std=None,
     ):
         """
-        Add an observation, action and observation after applying the action to the memory that is used
-        by the gaussian process models.
+        Add an observation, action and observation after applying the action to the
+        memory that is used by the gaussian process models.
         At regular number of points interval (self.training_frequency),
-        the training process of the gaussian process models will be launched to optimize the hyper-parameters.
+        the training process of the gaussian process models will be launched to
+        optimize the hyperparameters.
 
         Args:
                 obs (numpy.array): non-normalized observation. Dim=(Ns,)
                 action (numpy.array): non-normalized action. Dim=(Ns,)
-                obs_new (numpy.array): non-normalized observation obtained after applying the action on the observation.
-                                                                Dim=(Ns,)
+                obs_new (numpy.array): non-normalized observation obtained after
+                applying the action on the observation. Dim=(Ns,)
                 reward (float): reward obtained from the gym env. Unused at the moment.
-                                                The cost given state and action is computed instead.
-                check_storage (bool): If check_storage is true,
-                                                                predicted_state and predicted_state_std will be checked (if not None) to
-                                                                know weither to store the point in memory or not.
+                    The cost given state and action is computed instead.
+                check_storage (bool): If check_storage is true, predicted_state and
+                    predicted_state_std will be checked (if not None) to know weither
+                    to store the point in memory or not.
 
                 predicted_state (numpy.array or torch.Tensor or None):
-                                                        if check_storage is True and predicted_state is not None,
-                                                        the prediction error for that point will be computed.
-                                                        and the point will only be stored in memory if the
-                                                        prediction error is larger than self.error_pred_memory. Dim=(Ns,)
+                    if check_storage is True and predicted_state is not None,
+                    the prediction error for that point will be computed.
+                    and the point will only be stored in memory if the
+                    prediction error is larger than self.error_pred_memory. Dim=(Ns,)
 
                 predicted_state_std (numpy.array or torch.Tensor or None):
-                                                        If check_storage is true, and predicted_state_std is not None, the point will only be
-                                                        stored in memory if it is larger than self.error_pred_memory. Dim=(Ns,)
+                    If check_storage is true, and predicted_state_std is not None, the
+                    point will only be stored in memory if it is larger than
+                    `self.error_pred_memory`. Dim=(Ns,)
 
                 where Ns: dimension of states, Na: dimension of actions
         """
@@ -1023,33 +1024,51 @@ class GpMpcController(BaseControllerObject):
         step_print_train=25,
     ):
         """
-        Train the gaussian process models hyper-parameters such that the marginal-log likelihood
-        for the predictions of the points in memory is minimized.
-        This function is launched in parallel of the main process, which is why a queue is used to transfer
-        information back to the main process and why the gaussian process models are reconstructed
-        using the points in memory and hyper-parameters (they cant be sent directly as argument).
+        Train the gaussian process models hyper-parameters such that the marginal-log
+        likelihood for the predictions of the points in memory is minimized.
+        This function is launched in parallel of the main process, which is why a queue
+        is used to transfer information back to the main process and why the gaussian
+        process models are reconstructed using the points in memory and hyper-parameters
+        (they cant be sent directly as argument).
         If an error occurs, returns the parameters sent as init values
         (hyper-parameters obtained by the previous training process)
         Args:
-                queue (multiprocessing.queues.Queue): queue object used to transfer information to the main process
-                train_inputs (torch.Tensor): input data-points of the gaussian process models (concat(obs, actions)). Dim=(Np, Ns + Na)
-                train_targets (torch.Tensor): targets data-points of the gaussian process models (obs_new - obs). Dim=(Np, Ns)
-                parameters (list of OrderedDict): contains the hyper-parameters of the models used as init values.
-                                                                                        They are obtained by using [model.state_dict() for model in models]
-                                                                                        where models is a list containing gaussian process models of the gpytorch library:
-                                                                                        gpytorch.models.ExactGP
-                constraints_hyperparams (dict): Constraints on the hyper-parameters. See parameters.md for more information
+                queue (multiprocessing.queues.Queue): queue object used to transfer
+                information to the main process
+
+                train_inputs (torch.Tensor): input data-points of the gaussian process
+                models (concat(obs, actions)). Dim=(Np, Ns + Na)
+
+                train_targets (torch.Tensor): targets data-points of the gaussian
+                process models (obs_new - obs). Dim=(Np, Ns)
+
+                parameters (list of OrderedDict): contains the hyper-parameters of the
+                models used as init values. They are obtained by using
+                [model.state_dict() for model in models] where models is a list
+                containing gaussian process models of the gpytorch library:
+                gpytorch.models.ExactGP
+
+                constraints_hyperparams (dict): Constraints on the hyper-parameters.
+                    See parameters.md for more information
+
                 lr_train (float): learning rate of the training
+
                 num_iter_train (int): number of iteration for the training optimizer
-                clip_grad_value (float): value at which the gradient are clipped, so that the training is more stable
-                print_train (bool): weither to print the information during training. default=False
-                step_print_train (int): If print_train is True, only print the information every step_print_train iteration
+
+                clip_grad_value (float): value at which the gradient are clipped,
+                    so that the training is more stable
+
+                print_train (bool): weither to print the information during training.
+                    default=False
+
+                step_print_train (int): If print_train is True, only print the
+                    information every step_print_train iteration
         """
 
         torch.set_num_threads(1)
         start_time = time.time()
-        # create models, which is necessary since this function is used in a parallel process
-        # that do not share memory with the principal process
+        # create models, which is necessary since this function is used in a parallel
+        # process that do not share memory with the principal process
         models = create_models(
             train_inputs, train_targets, parameters, constraints_hyperparams
         )
@@ -1086,15 +1105,15 @@ class GpMpcController(BaseControllerObject):
 
             models[model_idx].covar_module.base_kernel.lengthscale = models[
                 model_idx
-            ].covar_module.base_kernel.raw_lengthscale_constraint.lower_bound + torch.rand(
-                models[model_idx].covar_module.base_kernel.lengthscale.shape
-            ) * (
+            ].covar_module.base_kernel.raw_lengthscale_constraint.lower_bound + (
                 models[
                     model_idx
                 ].covar_module.base_kernel.raw_lengthscale_constraint.upper_bound
                 - models[
                     model_idx
                 ].covar_module.base_kernel.raw_lengthscale_constraint.lower_bound
+            ) * torch.rand(
+                models[model_idx].covar_module.base_kernel.lengthscale.shape
             )
 
             models[model_idx].likelihood.noise = models[
@@ -1146,10 +1165,12 @@ class GpMpcController(BaseControllerObject):
                             .numpy()
                         )
                         print(
-                            f"Iter {i + 1}/{num_iter_train} - \nLoss: {loss.item():.5f}   "
-                            f"output_scale: {models[model_idx].covar_module.outputscale.item():.5f}   "
-                            f"lengthscale: {str(lengthscale)}   "
-                            f"noise: {models[model_idx].likelihood.noise.item() ** 0.5:.5f}"
+                            f"Iter {i + 1}/{num_iter_train} - \nLoss: {loss.item():.5f}"
+                            "   output_scale: "
+                            f"{models[model_idx].covar_module.outputscale.item():.5f}"
+                            f"   lengthscale: {str(lengthscale)}"
+                            "    noise: "
+                            f"{models[model_idx].likelihood.noise.item() ** 0.5:.5f}"
                         )
 
                     if loss < best_losses[model_idx]:
@@ -1166,7 +1187,8 @@ class GpMpcController(BaseControllerObject):
                 print(e)
 
             print(
-                "training process - model %d - time train %f - output_scale: %s - lengthscales: %s - noise: %s"
+                "training process - model %d - time train %f - output_scale: %s "
+                "- lengthscales: %s - noise: %s"
                 % (
                     model_idx,
                     time.time() - start_time,
@@ -1177,7 +1199,8 @@ class GpMpcController(BaseControllerObject):
             )
 
         print(
-            "training process - previous marginal log likelihood: %s - new marginal log likelihood: %s"
+            "training process - previous marginal log likelihood: %s "
+            "- new marginal log likelihood: %s"
             % (str(previous_losses.detach().numpy()), str(best_losses.detach().numpy()))
         )
         params_dict_list = []
@@ -1197,7 +1220,8 @@ class GpMpcController(BaseControllerObject):
 
     def check_and_close_processes(self):
         """
-        Check active parallel processes, wait for their resolution, get the parameters and close them
+        Check active parallel processes, wait for their resolution, get the parameters
+        and close them
         """
         if (
             "p_train" in self.__dict__

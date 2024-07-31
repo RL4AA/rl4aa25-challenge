@@ -1,7 +1,9 @@
+from abc import ABC, abstractmethod
+
 import torch
 
 
-class BaseControllerObject:
+class BaseControllerObject(ABC):
     def __init__(self, observation_space, action_space, n_points_init_memory=1000):
         self.action_space = action_space
         self.obs_space = observation_space
@@ -17,11 +19,14 @@ class BaseControllerObject:
 
         self.len_mem = 0
 
+    @abstractmethod
     def add_memory(self, observation, action, new_observation, reward, **kwargs):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def compute_action(self, observation, s_observation):
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def train(self):
-        raise NotImplementedError()
+        pass

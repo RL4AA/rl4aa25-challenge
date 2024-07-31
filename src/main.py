@@ -1,3 +1,4 @@
+import argparse
 import time
 
 import yaml
@@ -21,8 +22,8 @@ def init_graphics_and_controller(env, num_steps, params_controller_dict):
     return live_plot_obj, ctrl_obj
 
 
-def main():
-    with open("config/config.yaml", "r") as file:
+def main(args):
+    with open(args.config, "r") as file:
         params_controller_dict = yaml.safe_load(file)
 
     num_steps = params_controller_dict["num_steps_env"]
@@ -66,9 +67,11 @@ def main():
                 predicted_state = None
                 predicted_state_std = None
                 check_storage = False
-            # If num_repeat_actions != 1, the gaussian process models predict that much step ahead,
-            # For iteration k, the memory holds obs(k - step), action (k - step), obs(k), reward(k)
-            # Add memory is put before compute action because it uses data from step before
+            # If num_repeat_actions != 1, the gaussian process models predict that
+            # much steps ahead. For iteration k, the memory holds
+            # obs(k - step), action (k - step), obs(k), reward(k)
+            # Add memory is put before compute action because it uses data from
+            # the step before
             ctrl_obj.add_memory(
                 obs=obs_prev_ctrl,
                 action=action,
@@ -96,8 +99,8 @@ def main():
                 live_plot_obj.update(
                     obs=obs, cost=cost, action=action, info_dict=info_dict
                 )
-        except:
-            print("problem in plot")
+        except Exception as e:
+            print("An error occurred when plotting:", str(e))
         # set obs to previous control
         obs_prev_ctrl = obs
         obs = obs_new
@@ -107,4 +110,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="config/config.yaml")
+
+    args = parser.parse_args()
+    main(args)

@@ -301,22 +301,6 @@ class Plane(Enum):
     vertical = 1
 
 
-class EpisodeData:
-    def __init__(self):
-        self.states = []
-        self.actions = []
-        self.rewards = []
-        self.is_done = False
-
-    def add_step(self, state, action, reward):
-        self.states.append(state)
-        self.actions.append(action)
-        self.rewards.append(reward)
-
-    def end_episode(self):
-        self.is_done = True
-
-
 class SmartEpisodeTrackerWrapper(Wrapper):
     def __init__(self, env):
         super().__init__(env)

@@ -79,19 +79,13 @@ def create_models(
     for idx_model in range(num_models):
         if constraints_gp is not None:
             if "min_std_noise" in constraints_gp.keys():
-                if (
-                    type(constraints_gp["min_std_noise"]) != float
-                    and type(constraints_gp["min_std_noise"]) != int
-                ):
+                if not isinstance(constraints_gp["min_std_noise"], (float, int)):
                     min_var_noise = np.power(
                         constraints_gp["min_std_noise"][idx_model], 2
                     )
                 else:
                     min_var_noise = np.power(constraints_gp["min_std_noise"], 2)
-                if (
-                    type(constraints_gp["max_std_noise"]) != float
-                    and type(constraints_gp["max_std_noise"]) != int
-                ):
+                if not isinstance(constraints_gp["max_std_noise"], (float, int)):
                     max_var_noise = np.power(
                         constraints_gp["max_std_noise"][idx_model], 2
                     )
@@ -105,18 +99,12 @@ def create_models(
                 )
 
             if "min_outputscale" in constraints_gp.keys():
-                if (
-                    type(constraints_gp["min_outputscale"]) != float
-                    and type(constraints_gp["min_outputscale"]) != int
-                ):
+                if not isinstance(constraints_gp["min_outputscale"], (float, int)):
                     min_outputscale = constraints_gp["min_outputscale"][idx_model]
                 else:
                     min_outputscale = constraints_gp["min_outputscale"]
 
-                if (
-                    type(constraints_gp["max_outputscale"]) != float
-                    and type(constraints_gp["max_outputscale"]) != int
-                ):
+                if not isinstance(constraints_gp["max_outputscale"], (float, int)):
                     max_outputscale = constraints_gp["max_outputscale"][idx_model]
                 else:
                     max_outputscale = constraints_gp["max_outputscale"]
@@ -128,17 +116,11 @@ def create_models(
                 )
 
             if "min_lengthscale" in constraints_gp.keys():
-                if (
-                    type(constraints_gp["min_lengthscale"]) == float
-                    or type(constraints_gp["min_lengthscale"]) == int
-                ):
+                if isinstance(constraints_gp["min_lengthscale"], (float, int)):
                     min_lengthscale = constraints_gp["min_lengthscale"]
                 else:
                     min_lengthscale = constraints_gp["min_lengthscale"][idx_model]
-                if (
-                    type(constraints_gp["max_lengthscale"]) == float
-                    or type(constraints_gp["max_lengthscale"]) == int
-                ):
+                if isinstance(constraints_gp["max_lengthscale"], (float, int)):
                     max_lengthscale = constraints_gp["max_lengthscale"]
                 else:
                     max_lengthscale = constraints_gp["max_lengthscale"][idx_model]
@@ -154,7 +136,7 @@ def create_models(
         # dict type is used when initializing the models from the json config file
         # list type is used when initializing the models in the parallel training
         # process using the exported parameters
-        if type(params) == dict:
+        if isinstance(params, dict):
             hypers = {
                 "base_kernel.lengthscale": params["base_kernel.lengthscale"][idx_model],
                 "outputscale": params["outputscale"][idx_model],
@@ -164,7 +146,7 @@ def create_models(
             }
             models[idx_model].likelihood.initialize(**hypers_likelihood)
             models[idx_model].covar_module.initialize(**hypers)
-        elif type(params) == list:
+        elif isinstance(params, list):
             models[idx_model].load_state_dict(params[idx_model])
     return models
 
