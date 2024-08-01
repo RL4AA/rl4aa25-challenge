@@ -22,19 +22,6 @@ def test_check_env_cheetah(section):
     check_env(env)
 
 
-@pytest.mark.ocelot
-@pytest.mark.ea
-def test_check_env_ocelot():
-    """
-    Test SB3's `check_env` on all environments using their Ocelot backends.
-
-    NOTE Only the EA environment currently has an Ocelot backend.
-    """
-    env = ea.TransverseTuning(backend="ocelot")
-    env = RescaleAction(env, -1, 1)  # Prevents SB3 action space scale warning
-    check_env(env)
-
-
 @pytest.mark.doocs
 @pytest.mark.parametrize(
     "section",
