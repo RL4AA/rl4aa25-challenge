@@ -41,6 +41,20 @@ Now the code is undergoing some refactoring for it to work with ARES-EA Cheetah 
 
 ## Development Note
 
+### Code Formatting
+
+Please install `black`, `isort`, and `flake8` for cohesive code formatting.
+
+If you are using VS Code, this can be done by installing the native extensions.
+
+- VS Code → View → Extensions → [Black Formatter](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter)
+- VS Code → View → Extensions → [isort](https://marketplace.visualstudio.com/items?itemName=ms-python.isort)
+  - In the `isort` extension setting, add `--profile black` to the Args
+- VS Code → View → Extensions → [flake8](https://marketplace.visualstudio.com/items?itemName=ms-python.flake8)
+  - In the `flake8` extension setting, add `--max-line-length=88` and `--extend-ignore=E203, E701, W503` to the Args
+
+You can check Format on Save so that the formatting is done automatically. (`"editor.formatOnSave": true`)
+
 ### Look into the environment
 
 - `make_env` creates the wrapped env for GP-MPC control
@@ -61,6 +75,8 @@ Now it's a bit of a hack to make it compatible (should be changed later, see bel
 
 ### Code To-Dos
 
+Functionalities:
+
 - Move the normalization from GP-MPC controller to Env Wrapper
   - i.e. the methods `to_normed_obs_tensor`, `to_normed_var_tensor`, `to_normed_action_tensor`, `denorm_action` should be no longer needed when `RescaleAction` and `RescaleObservation` wrappers are used?; And change the calculations in `gp_mpc_controller`
 - Support different reward/cost mode
@@ -72,8 +88,15 @@ Now it's a bit of a hack to make it compatible (should be changed later, see bel
   - The cost calculation of GP-MPC should take the `env.target_beam`, instead of statically from the config file
 - Implement proper model saving (this was removed in the RL4AA'24 tutorial?)
 - Fix a Cheetah version for the code / update the env with cheetah 0.7.0 (now 0.6.3 works fine)
-- Refactor `LivePlotSequential` in  `gpmpc/utils/utils.py`, now the plot gives generic legends, and plot all the states including the target_beam.
+- Refactor `LivePlotSequential` in `gpmpc/utils/utils.py`, now the plot gives generic legends, and plot all the states including the target_beam.
 - Refactor the `observation_space` limit for current beam (possibly also in `RescaleObservation` wrapper) (it was `[-inf, inf]` otherwise the scaling in gp-mpc and plotting now will complain), now it's rather arbitrarily chosen to be `[-5e-3,0,-5e-3,0] -> [5e-3,5e-3,5e-3,5e-3]`
+
+Maintainability
+
+- Add Typing in all the GP-MPC part;
+- Fill the missing doc-strings in the GP-MPC part;
+- Refactor variable names to be understandable
+- Implement proper unit tests; At a later stage, add the tests to CI/CDs
 - Improve the plotting in `EAMpcEpisodeWithPlotting` wrapper
 
 ### Some general remark
