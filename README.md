@@ -128,3 +128,5 @@ For more examples and details on the ARES RL environment, c.f.
 
 - Paper: [Reinforcement learning-trained optimisers and Bayesian optimisation for online particle accelerator tuning](https://www.nature.com/articles/s41598-024-66263-y)
 - Code repository: <https://github.com/desy-ml/rl-vs-bo>
+
+Now we add new tests
