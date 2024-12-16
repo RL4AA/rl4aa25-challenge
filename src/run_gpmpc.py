@@ -2,12 +2,14 @@ import argparse
 import time
 
 import gymnasium as gym
+import torch
 import yaml
 from gymnasium.wrappers import FlattenObservation, RecordVideo, RescaleAction, TimeLimit
 from stable_baselines3.common.monitor import Monitor
 
 from .environments import ea
 from .gpmpc.control_objects.gp_mpc_controller import GpMpcController
+from .gpmpc.cost_functions.base_cost import QuadraticCostFunction
 from .gpmpc.utils.utils import close_run, init_control, init_visu_and_folders
 from .wrappers import (
     EAMpcEpisodeWithPlotting,
@@ -23,10 +25,26 @@ def init_graphics_and_controller(env, num_steps, params_controller_dict):
         env=env, num_steps=num_steps, params_controller_dict=params_controller_dict
     )
 
+    cost_function = QuadraticCostFunction(
+        target_state=torch.tensor(
+            params_controller_dict["controller"]["target_state_norm"]
+        ),
+        target_action=torch.tensor(
+            params_controller_dict["controller"]["target_action_norm"]
+        ),
+        weight_state_matrix=torch.diag(
+            torch.tensor(params_controller_dict["controller"]["weight_state"])
+        ),
+        weight_action_matrix=torch.diag(
+            torch.tensor(params_controller_dict["controller"]["weight_action"])
+        ),
+    )
+
     ctrl_obj = GpMpcController(
         observation_space=env.observation_space,
         action_space=env.action_space,
         params_dict=params_controller_dict,
+        cost_function=cost_function,
     )
 
     return live_plot_obj, ctrl_obj

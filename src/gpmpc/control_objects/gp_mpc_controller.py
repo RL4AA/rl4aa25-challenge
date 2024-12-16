@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from scipy.optimize import minimize
 
+from src.gpmpc.cost_functions.base_cost import BaseCostFunction
 from src.gpmpc.utils.utils import create_models
 
 from .abstract_control_obj import BaseControllerObject
@@ -15,8 +16,18 @@ torch.set_default_dtype(torch.double)
 
 
 class GpMpcController(BaseControllerObject):
-    def __init__(self, observation_space, action_space, params_dict):
+
+    def __init__(
+        self,
+        observation_space,
+        action_space,
+        params_dict,
+        cost_function: BaseCostFunction,
+    ):
         params_dict = self.preprocess_params(params_dict)
+
+        self.cost_function = cost_function
+
         self.weight_matrix_cost = torch.block_diag(
             torch.diag(params_dict["controller"]["weight_state"]),
             torch.diag(params_dict["controller"]["weight_action"]),
@@ -236,114 +247,6 @@ class GpMpcController(BaseControllerObject):
         )
         return action
 
-    def compute_cost(self, state_mu, state_var, action):
-        """
-        Compute the quadratic cost of one state distribution or a trajectory of states
-        distributions given the mean value and variance of states (observations), the
-        weight matrix, and target state.
-        The state, state_var and action must be normalized.
-        If reading directly from the gym env observation,
-        this can be done with the gym env action space and observation space.
-        See an example of normalization in the add_points_memory function.
-        Args:
-            state_mu (torch.Tensor): normed mean value of the state or observation
-                distribution (elements between 0 and 1). dim=(Ns) or dim=(Np, Ns)
-            state_var (torch.Tensor): normed variance matrix of the state or
-            observation distribution (elements between 0 and 1)
-                dim=(Ns, Ns) or dim=(Np, Ns, Ns)
-            action (torch.Tensor): normed actions. (elements between 0 and 1).
-                dim=(Na) or dim=(Np, Na)
-
-            Np: length of the prediction trajectory. (=self.len_horizon)
-            Na: dimension of the gym environment actions
-            Ns: dimension of the gym environment states
-
-        Returns:
-            cost_mu (torch.Tensor): mean value of the cost distribution.
-                dim=(1) or dim=(Np)
-            cost_var (torch.Tensor): variance of the cost distribution.
-                dim=(1) or dim=(Np)
-        """
-
-        if state_var.ndim == 3:
-            error = torch.cat((state_mu, action), 1) - self.target_state_action_norm
-            state_action_var = torch.cat(
-                (
-                    torch.cat(
-                        (
-                            state_var,
-                            torch.zeros(
-                                (
-                                    state_var.shape[0],
-                                    state_var.shape[1],
-                                    action.shape[1],
-                                )
-                            ),
-                        ),
-                        2,
-                    ),
-                    torch.zeros(
-                        (
-                            state_var.shape[0],
-                            action.shape[1],
-                            state_var.shape[1] + action.shape[1],
-                        )
-                    ),
-                ),
-                1,
-            )
-        else:
-            error = torch.cat((state_mu, action), 0) - self.target_state_action_norm
-            state_action_var = torch.block_diag(
-                state_var, torch.zeros((action.shape[0], action.shape[0]))
-            )
-        cost_mu = (
-            torch.diagonal(
-                torch.matmul(state_action_var, self.weight_matrix_cost),
-                dim1=-1,
-                dim2=-2,
-            ).sum(-1)
-            + torch.matmul(
-                torch.matmul(
-                    error[..., None].transpose(-1, -2), self.weight_matrix_cost
-                ),
-                error[..., None],
-            ).squeeze()
-        )
-        TS = self.weight_matrix_cost @ state_action_var
-        cost_var_term1 = torch.diagonal(2 * TS @ TS, dim1=-1, dim2=-2).sum(-1)
-        cost_var_term2 = TS @ self.weight_matrix_cost
-        cost_var_term3 = (
-            4 * error[..., None].transpose(-1, -2) @ cost_var_term2 @ error[..., None]
-        ).squeeze()
-        cost_var = cost_var_term1 + cost_var_term3
-        return cost_mu, cost_var
-
-    def compute_cost_terminal(self, state_mu, state_var):
-        """
-        Compute the terminal cost of the prediction trajectory.
-        Args:
-            state_mu (torch.Tensor): mean value of the terminal state distribution.
-                dim=(Ns)
-            state_var (torch.Tensor): variance matrix of the terminal state
-                distribution. dim=(Ns, Ns)
-
-        Returns:
-            cost_mu (torch.Tensor): mean value of the cost distribution. dim=(1)
-            cost_var (torch.Tensor): variance of the cost distribution. dim=(1)
-        """
-        error = state_mu - self.target_state_norm
-        cost_mu = torch.trace(
-            torch.matmul(state_var, self.weight_matrix_cost_terminal)
-        ) + torch.matmul(
-            torch.matmul(error.t(), self.weight_matrix_cost_terminal), error
-        )
-        TS = self.weight_matrix_cost_terminal @ state_var
-        cost_var_term1 = torch.trace(2 * TS @ TS)
-        cost_var_term2 = 4 * error.t() @ TS @ self.weight_matrix_cost_terminal @ error
-        cost_var = cost_var_term1 + cost_var_term2
-        return cost_mu, cost_var
-
     def compute_cost_unnormalized(self, obs, action, obs_var=None):
         """
         Compute the cost on un-normalized state and actions.
@@ -366,7 +269,9 @@ class GpMpcController(BaseControllerObject):
             obs_var_norm = self.obs_var_norm
         else:
             obs_var_norm = self.to_normed_var_tensor(obs_var)
-        cost_mu, cost_var = self.compute_cost(obs_norm, obs_var_norm, action_norm)
+        cost_mu, cost_var = self.cost_function(
+            obs_norm, obs_var_norm, action_norm, terminal=False
+        )
         return cost_mu.item(), cost_var.item()
 
     @staticmethod
@@ -597,11 +502,11 @@ class GpMpcController(BaseControllerObject):
                 + v.t() @ input_var[: states_var_pred.shape[1]].t()
             )
 
-        costs_traj, costs_traj_var = self.compute_cost(
-            states_mu_pred[:-1], states_var_pred[:-1], actions
+        costs_traj, costs_traj_var = self.cost_function(
+            states_mu_pred[:-1], states_var_pred[:-1], actions, terminal=False
         )
-        cost_traj_final, costs_traj_var_final = self.compute_cost_terminal(
-            states_mu_pred[-1], states_var_pred[-1]
+        cost_traj_final, costs_traj_var_final = self.cost_function(
+            states_mu_pred[-1], states_var_pred[-1], terminal=True
         )
         costs_traj = torch.cat((costs_traj, cost_traj_final[None]), 0)
         costs_traj_var = torch.cat((costs_traj_var, costs_traj_var_final[None]), 0)
@@ -862,8 +767,8 @@ class GpMpcController(BaseControllerObject):
             actions_norm = torch.Tensor(actions_norm)
             action = self.denorm_action(action_next)
 
-            cost, cost_var = self.compute_cost(
-                obs_mu_normed, obs_var_norm, actions_norm[0]
+            cost, cost_var = self.cost_function(
+                obs_mu_normed, obs_var_norm, actions_norm[0], terminal=False
             )
             # states_denorm = self.states_mu_pred[1:] * \
             # (self.observation_space.high - self.observation_space.low) + \
