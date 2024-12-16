@@ -2,7 +2,7 @@ black
 botorch
 cheetah-accelerator==0.6.3  # TODO Replace when fixed
 flake8
-gymnasium[other]
+gymnasium[other]==1.0.0
 ipympl
 ipywidgets
 isort
@@ -15,8 +15,8 @@ rl_zoo3
 SciencePlots
 scipy
 seaborn
-stable-baselines3>=2.0
+stable-baselines3==2.4.0
 tensorboard
 tqdm
 wandb
-xopt==2.0.0
+xopt>=2.0.0

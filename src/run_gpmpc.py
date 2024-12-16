@@ -3,13 +3,7 @@ import time
 
 import gymnasium as gym
 import yaml
-from gymnasium.wrappers import (
-    FlattenObservation,
-    FrameStack,
-    RecordVideo,
-    RescaleAction,
-    TimeLimit,
-)
+from gymnasium.wrappers import FlattenObservation, RecordVideo, RescaleAction, TimeLimit
 from stable_baselines3.common.monitor import Monitor
 
 from .environments import ea
@@ -178,8 +172,6 @@ def make_env(
     if config["polished_donkey_reward"]:
         env = PolishedDonkeyReward(env)
     env = FlattenObservation(env)
-    if config["frame_stack"] > 1:
-        env = FrameStack(env, config["frame_stack"])
     env = Monitor(env)
     if record_video:
         env = RecordVideo(
