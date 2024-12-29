@@ -866,6 +866,8 @@ class GpMpcController(BaseControllerObject):
         self.y[self.len_mem] = obs_new_norm - obs_norm
         self.rewards[self.len_mem] = reward
 
+        # Store the last action
+        self.action_previous_iter = action_norm
         # if self.include_time_gp:
         #     self.x[self.len_mem, -1] = self.n_iter_obs
 

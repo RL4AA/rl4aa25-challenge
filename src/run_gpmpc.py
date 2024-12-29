@@ -4,7 +4,13 @@ import time
 import gymnasium as gym
 import torch
 import yaml
-from gymnasium.wrappers import FlattenObservation, RecordVideo, RescaleAction, TimeLimit
+from gymnasium.wrappers import (
+    FilterObservation,
+    FlattenObservation,
+    RecordVideo,
+    RescaleAction,
+    TimeLimit,
+)
 from stable_baselines3.common.monitor import Monitor
 
 from .environments import ea
@@ -15,7 +21,6 @@ from .wrappers import (
     EAMpcEpisodeWithPlotting,
     LogTaskStatistics,
     PlotEpisode,
-    PolishedDonkeyReward,
     RescaleObservation,
 )
 
@@ -187,8 +192,7 @@ def make_env(
         env = RescaleObservation(env, -1, 1)
     if config["rescale_action"]:
         env = RescaleAction(env, -1, 1)
-    if config["polished_donkey_reward"]:
-        env = PolishedDonkeyReward(env)
+    env = FilterObservation(env, ["beam", "magnets"])
     env = FlattenObservation(env)
     env = Monitor(env)
     if record_video:
