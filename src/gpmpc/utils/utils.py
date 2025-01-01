@@ -2,6 +2,7 @@ import gpytorch
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 from src.gpmpc.control_objects.gp_models import ExactGPModelMonoTask
 
@@ -205,9 +206,7 @@ def init_control(
         live_plot_obj.update(obs=obs, action=action, cost=cost, info_dict=None)
 
         # Store the last action for potential future use
-        ctrl_obj.action_previous_iter = (
-            action  # Adjust as needed, e.g., convert to tensor
-        )
+        ctrl_obj.action_previous_iter = torch.tensor(action)
 
     return (
         ctrl_obj,
@@ -349,7 +348,7 @@ class LivePlotSequential:
             for action_idx in range(action_space.shape[0])
         ]
         self.line_costs_pred = self.axes[2].plot(
-            [], [], label="predicted cost", color="k", linestyle="dashed"
+            [], [], label="predicted reward", color="k", linestyle="dashed"
         )
 
         self.axes[0].legend(fontsize=fontsize)

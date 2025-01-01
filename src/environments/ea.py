@@ -468,6 +468,10 @@ class TransverseTuning(gym.Env):
         else:
             return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+    @property
+    def action_names(self):
+        return ["Q1", "Q2", "CV", "Q3", "CH"]
+
     def close(self):
         if self.render_mode == "human":
             cv2.destroyWindow("Transverse Tuning")

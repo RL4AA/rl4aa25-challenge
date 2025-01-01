@@ -788,9 +788,7 @@ class GpMpcController(BaseControllerObject):
                 "cost std": cost_var.sqrt().item(),
                 "predicted costs": self.costs_trajectory[1:],
                 "predicted costs std": self.costs_traj_var[1:].sqrt(),
-                "mean predicted cost": np.min(
-                    [self.costs_trajectory[1:].mean().item(), 3]
-                ),
+                "mean predicted cost": self.costs_trajectory[1:].mean().item(),
                 "mean predicted cost std": self.costs_traj_var[1:].sqrt().mean().item(),
                 "lower bound mean predicted cost": self.cost_traj_mean_lcb.item(),
             }

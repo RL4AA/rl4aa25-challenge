@@ -38,9 +38,9 @@ env:
 
 # Gaussian Process Initialization Parameters
 gp_init:
-  noise_covar.noise: [1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]
-  base_kernel.lengthscale: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
-  outputscale: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+  noise_covar.noise: [1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]
+  base_kernel.lengthscale: [0.3, 0.3, 0.3, 0.3]
+  outputscale: [0.5, 0.5, 0.5, 0.5]
 
 # Gaussian Process Constraints
 gp_constraints:
@@ -57,10 +57,10 @@ gp_constraints:
 controller:
   # length equals to the length of the observation_space
   # 4 current beam + 5 magnets = 9 states
-  target_state_norm: [0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-  weight_state: [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-  weight_state_terminal: [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-  obs_var_norm: [1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]
+  target_state_norm: [0.5, 0.0, 0.5, 0.0]
+  weight_state: [1.0, 1.0, 1.0, 1.0]
+  weight_state_terminal: [1.0, 1.0, 1.0, 1.0]
+  obs_var_norm: [1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]
   # length equals to the length of the action_space
   target_action_norm: [0.5, 0.5, 0.5, 0.5, 0.5]
   weight_action: [0.0, 0.0, 0.0, 0.0, 0.0]
@@ -97,5 +97,5 @@ actions_optimizer:
 # Memory Configuration for reducing the amount of data in the buffer
 memory:
   # length equals to the length of the observation_space
-  min_error_prediction_state_for_memory: [1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20]
-  min_prediction_state_std_for_memory: [1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20]
+  min_error_prediction_state_for_memory: [1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20]
+  min_prediction_state_std_for_memory: [1.0e-20, 1.0e-20, 1.0e-20, 1.0e-20]

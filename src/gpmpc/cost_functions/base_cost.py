@@ -70,9 +70,9 @@ class QuadraticCostFunction(BaseCostFunction):
         this can be done with the gym env action space and observation space.
         See an example of normalization in the add_points_memory function.
         Args:
-            state_mu (torch.Tensor): normed mean value of the state or observation
+            state_mu (torch.Tensor): normalized mean value of the state or observation
                 distribution (elements between 0 and 1). dim=(Ns) or dim=(Np, Ns)
-            state_var (torch.Tensor): normed variance matrix of the state or
+            state_var (torch.Tensor): normalized variance matrix of the state or
             observation distribution (elements between 0 and 1)
                 dim=(Ns, Ns) or dim=(Np, Ns, Ns)
             action (torch.Tensor): normed actions. (elements between 0 and 1).

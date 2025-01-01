@@ -71,6 +71,7 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
         self.ax3.set_title("MAEs for Each Episode")
         self.ax3.set_xlabel("Cumulative Step")
         self.ax3.set_ylabel("MAE (mm)")
+        self.ax3.set_yscale("log")
         self.ax3.grid()
 
         # Update legends
@@ -78,8 +79,11 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
             Line2D([], [], color=self.colors_states[i], label=f"State {i + 1}")
             for i in range(self.n_states)
         ]
+
+        action_names = self.env.get_wrapper_attr("action_names")
+
         legend_handles_actions = [
-            Line2D([], [], color=self.colors_actions[i], label=f"Action {i + 1}")
+            Line2D([], [], color=self.colors_actions[i], label=action_names[i])
             for i in range(self.n_actions)
         ]
 

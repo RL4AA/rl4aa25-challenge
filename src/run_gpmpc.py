@@ -26,6 +26,15 @@ from .wrappers import (
 
 
 def init_graphics_and_controller(env, num_steps, params_controller_dict):
+    """Initialize the graphics and the controller object.
+
+    :param env: The environment object.
+    :param num_steps: The number of steps to run the simulation.
+    :param params_controller_dict: The dictionary containing the parameters of the
+    controller.
+    :return: The `live_plot_obj` and the `ctrl_obj`.
+
+    """
     live_plot_obj = init_visu_and_folders(
         env=env, num_steps=num_steps, params_controller_dict=params_controller_dict
     )
@@ -118,15 +127,13 @@ def main(args):
                 obs, _ = env.reset()
             # Compute the action
             action, info_dict = ctrl_obj.compute_action(obs_mu=obs)
-            # if params_controller_dict["verbose"]:
-            if True:
+            if params_controller_dict["verbose"]:
                 for key in info_dict:
                     print(key + ": " + str(info_dict[key]))
 
         # perform action on the system
         obs_new, reward, done, _, _ = env.step(action)
         cost, cost_var = ctrl_obj.compute_cost_unnormalized(obs, action)
-        # costs_runs[idx_test, iter_ctrl] = cost
         try:
             if live_plot_obj is not None:
                 live_plot_obj.update(
@@ -189,10 +196,10 @@ def make_env(
     if log_task_statistics:
         env = LogTaskStatistics(env)
     if config["normalize_observation"] and not config["running_obs_norm"]:
-        env = RescaleObservation(env, -1, 1)
+        env = RescaleObservation(env, 0, 1)
     if config["rescale_action"]:
-        env = RescaleAction(env, -1, 1)
-    env = FilterObservation(env, ["beam", "magnets"])
+        env = RescaleAction(env, 0, 1)
+    env = FilterObservation(env, ["beam"])
     env = FlattenObservation(env)
     env = Monitor(env)
     if record_video:
@@ -207,7 +214,7 @@ def make_env(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/config_ea.yaml")
+    parser.add_argument("--config", type=str, default="config/config_ea_direct.yaml")
     # To-do: Add an argument for saving the results
     args = parser.parse_args()
     main(args)
