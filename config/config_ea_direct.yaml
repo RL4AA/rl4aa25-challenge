@@ -1,5 +1,5 @@
 # General Parameters
-num_steps_env: 100 # Total interactions GP-MPC will have with the environment
+num_steps_env: 150 # Total interactions GP-MPC will have with the environment
 random_actions_init: 5 # Number of random actions to initialize the GP-MPC
 verbose: false
 
@@ -34,7 +34,7 @@ env:
   normalize_reward: false  # Not really needed because normalised by design
   rescale_action: true
   target_threshold: null  # 2e-5 m is estimated screen resolution
-  max_episode_steps: 100
+  max_episode_steps: 50
 
 # Gaussian Process Initialization Parameters
 gp_init:
@@ -80,6 +80,7 @@ train:
   clip_grad_value: 1.0e-4
   print_train: false
   step_print_train: 50
+  num_cores_train: 4
 
 # Action Optimizer Configuration
 actions_optimizer:

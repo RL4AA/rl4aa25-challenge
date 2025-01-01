@@ -97,9 +97,12 @@ def main(args):
     )
 
     info_dict = None
-    done = False
+    terminated = False
+    truncated = False
+    # Perform the control loop
     for iter_ctrl in range(random_actions_init, num_steps):
         time_start = time.time()
+        # Repeat the action for `num_repeat_actions` steps, then compute a new action
         if iter_ctrl % num_repeat_actions == 0:
             if info_dict is not None:
                 predicted_state = info_dict["predicted states"][0]
@@ -123,16 +126,17 @@ def main(args):
                 predicted_state=predicted_state,
                 predicted_state_std=predicted_state_std,
             )
-            if done:
-                obs, _ = env.reset()
+
             # Compute the action
             action, info_dict = ctrl_obj.compute_action(obs_mu=obs)
             if params_controller_dict["verbose"]:
                 for key in info_dict:
                     print(key + ": " + str(info_dict[key]))
 
+        if terminated or truncated:
+            obs, _ = env.reset()
         # perform action on the system
-        obs_new, reward, done, _, _ = env.step(action)
+        obs_new, reward, terminated, truncated, _ = env.step(action)
         cost, cost_var = ctrl_obj.compute_cost_unnormalized(obs, action)
         try:
             if live_plot_obj is not None:
@@ -146,7 +150,9 @@ def main(args):
         obs = obs_new
         print("time loop: " + str(time.time() - time_start) + " s\n")
 
-        close_run(ctrl_obj=ctrl_obj, env=env)
+    # Close the environment
+    input("Press Enter to close the environment...")
+    close_run(ctrl_obj=ctrl_obj, env=env)
 
 
 def make_env(

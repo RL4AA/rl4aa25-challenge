@@ -133,7 +133,7 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
         return start_step + len(trajectory)
 
     def step(self, action):
-        observation, reward, done, _, info = self.env.step(action)
+        observation, reward, terminated, truncated, info = self.env.step(action)
 
         if self.current_episode is None:
             self.current_episode = EpisodeData()
@@ -141,13 +141,13 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
         mae = self._calculate_mae()
         self.current_episode.add_step(observation, action, reward, mae)
 
-        if done:
+        if terminated or truncated:
             self.current_episode.end_episode()
             self.episodes.append(self.current_episode)
             self.current_episode = None
 
         self._update_plots()
-        return observation, reward, done, False, info
+        return observation, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
         observation, info = self.env.reset(**kwargs)

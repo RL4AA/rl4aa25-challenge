@@ -115,6 +115,10 @@ class GpMpcController(BaseControllerObject):
             self.models[idx_model].eval()
 
         self.num_cores_main = multiprocessing.cpu_count()
+        self.num_cores_train = min(
+            self.num_cores_main - 1, params_dict["train"]["num_cores_train"]
+        )
+
         self.ctx = multiprocessing.get_context("spawn")
         # self.ctx = multiprocessing.get_context('fork')
         self.queue_train = self.ctx.Queue()
@@ -907,6 +911,7 @@ class GpMpcController(BaseControllerObject):
                     self.clip_grad_value,
                     self.print_train,
                     self.step_print_train,
+                    self.num_cores_train,
                 ),
             )
             self.p_train.start()
@@ -924,6 +929,7 @@ class GpMpcController(BaseControllerObject):
         clip_grad_value,
         print_train=False,
         step_print_train=25,
+        num_cores_train=1,
     ):
         """
         Train the gaussian process models hyper-parameters such that the marginal-log
@@ -967,7 +973,7 @@ class GpMpcController(BaseControllerObject):
                     information every step_print_train iteration
         """
 
-        torch.set_num_threads(1)
+        torch.set_num_threads(num_cores_train)
         start_time = time.time()
         # create models, which is necessary since this function is used in a parallel
         # process that do not share memory with the principal process
