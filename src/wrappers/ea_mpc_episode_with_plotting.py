@@ -60,12 +60,12 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
 
         self.ax1.set_title("Trajectories for Each Episode")
         self.ax1.set_xlabel("Cumulative Step")
-        self.ax1.set_ylabel("State Value")
+        self.ax1.set_ylabel("Normalized State Value")
         self.ax1.grid()
 
         self.ax2.set_title("Actions for Each Episode")
         self.ax2.set_xlabel("Cumulative Step")
-        self.ax2.set_ylabel("Action Value")
+        self.ax2.set_ylabel("Normalized Action Value")
         self.ax2.grid()
 
         self.ax3.set_title("MAEs for Each Episode")
