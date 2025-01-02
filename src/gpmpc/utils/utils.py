@@ -177,9 +177,32 @@ def init_control(
     obs, _ = env.reset()
     action, cost, obs_prev_ctrl = None, None, None
     done = False
+
+    # Set the target state
+    new_target_state = env.get_wrapper_attr("normalized_target_beam")(
+        min_observation=ctrl_obj.obs_space.low,
+        max_observation=ctrl_obj.obs_space.high,
+    )
+    ctrl_obj.cost_function.set_target_state(torch.tensor(new_target_state))
+
+    # Perform random actions to initialize the memory
     for idx_action in range(random_actions_init):
-        if idx_action % num_repeat_actions == 0 or action is None:
+        if action is None:
             action = env.action_space.sample()
+        elif idx_action % num_repeat_actions == 0:
+            if ctrl_obj.limit_action_change:
+                # Sample action within the limit_action_range
+                delta_action = (
+                    (np.random.rand(*action.shape) - 0.5)
+                    * 2
+                    * ctrl_obj.max_change_action_norm
+                )
+                normed_action = ctrl_obj.to_normed_action_tensor(action) + delta_action
+                normed_action = torch.clamp(normed_action, 0, 1)
+                action = ctrl_obj.denorm_action(normed_action).numpy()
+            else:
+                action = env.action_space.sample()
+
             if obs_prev_ctrl is not None and cost is not None:
                 ctrl_obj.add_memory(
                     obs=obs_prev_ctrl,

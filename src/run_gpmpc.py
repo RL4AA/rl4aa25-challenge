@@ -101,7 +101,11 @@ def main(args):
     truncated = False
     # Perform the control loop
     for iter_ctrl in range(random_actions_init, num_steps):
-        time_start = time.time()
+        # Temporary: use time.sleep to simulate the time needed for the control loop
+        time.sleep(0.5)
+        # time.sleep(0.5)
+
+        # time_start = time.time()
         # Repeat the action for `num_repeat_actions` steps, then compute a new action
         if iter_ctrl % num_repeat_actions == 0:
             if info_dict is not None:
@@ -135,6 +139,14 @@ def main(args):
 
         if terminated or truncated:
             obs, _ = env.reset()
+            # Reset the target state for the cost calculation
+            new_target_state = new_target_state = env.get_wrapper_attr(
+                "normalized_target_beam"
+            )(
+                min_observation=ctrl_obj.obs_space.low,
+                max_observation=ctrl_obj.obs_space.high,
+            )
+            ctrl_obj.cost_function.set_target_state(torch.tensor(new_target_state))
         # perform action on the system
         obs_new, reward, terminated, truncated, _ = env.step(action)
         cost, cost_var = ctrl_obj.compute_cost_unnormalized(obs, action)
@@ -148,7 +160,7 @@ def main(args):
         # set obs to previous control
         obs_prev_ctrl = obs
         obs = obs_new
-        print("time loop: " + str(time.time() - time_start) + " s\n")
+        # print("time loop: " + str(time.time() - time_start) + " s\n")
 
     # Close the environment
     input("Press Enter to close the environment...")

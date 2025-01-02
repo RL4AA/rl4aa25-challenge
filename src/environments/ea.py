@@ -472,6 +472,20 @@ class TransverseTuning(gym.Env):
     def action_names(self):
         return ["Q1", "Q2", "CV", "Q3", "CH"]
 
+    @property
+    def observation_names(self):
+        return ["mu_x", "sigma_x", "mu_y", "sigma_y"]
+
+    def normalized_target_beam(self, min_observation, max_observation):
+        """Helper function to re-normalize the target beam parameters to new range."""
+        target_beam = self._target_beam
+        old_min = self.observation_space["target"].low
+        old_max = self.observation_space["target"].high
+        normalized_target_beam = min_observation + (target_beam - old_min) * (
+            max_observation - min_observation
+        ) / (old_max - old_min)
+        return normalized_target_beam
+
     def close(self):
         if self.render_mode == "human":
             cv2.destroyWindow("Transverse Tuning")

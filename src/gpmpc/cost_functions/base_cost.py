@@ -157,3 +157,7 @@ class QuadraticCostFunction(BaseCostFunction):
         cost_var_term2 = 4 * error.t() @ TS @ self.weight_state_matrix @ error
         cost_var = cost_var_term1 + cost_var_term2
         return cost_mu, cost_var
+
+    def set_target_state(self, target_state: torch.Tensor):
+        self.target_state = target_state
+        self.target_state_action = torch.cat([target_state, self.target_action])
