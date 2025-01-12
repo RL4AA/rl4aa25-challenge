@@ -1,5 +1,4 @@
 import argparse
-import time
 
 import gymnasium as gym
 import torch
@@ -23,6 +22,8 @@ from .wrappers import (
     PlotEpisode,
     RescaleObservation,
 )
+
+# import time
 
 
 def init_graphics_and_controller(env, num_steps, params_controller_dict):
@@ -72,7 +73,10 @@ def main(args):
     num_repeat_actions = params_controller_dict["controller"]["num_repeat_actions"]
     random_actions_init = params_controller_dict["random_actions_init"]
 
-    env = make_env(config=params_controller_dict["env"])
+    env = make_env(
+        config=params_controller_dict["env"],
+        wrapper_config=params_controller_dict["env_wrapper"],
+    )
     live_plot_obj, ctrl_obj = init_graphics_and_controller(
         env, num_steps, params_controller_dict
     )
@@ -102,7 +106,6 @@ def main(args):
     # Perform the control loop
     for iter_ctrl in range(random_actions_init, num_steps):
         # Temporary: use time.sleep to simulate the time needed for the control loop
-        time.sleep(0.5)
         # time.sleep(0.5)
 
         # time_start = time.time()
@@ -132,7 +135,10 @@ def main(args):
             )
 
             # Compute the action
-            action, info_dict = ctrl_obj.compute_action(obs_mu=obs)
+            print("Step: " + str(iter_ctrl))
+            action, info_dict = ctrl_obj.compute_action(
+                obs_mu=obs, wait_for_training=True
+            )
             if params_controller_dict["verbose"]:
                 for key in info_dict:
                     print(key + ": " + str(info_dict[key]))
@@ -169,53 +175,32 @@ def main(args):
 
 def make_env(
     config: dict,
-    record_video: bool = False,
-    plot_episode: bool = False,
+    wrapper_config: dict = None,
     log_task_statistics: bool = False,
+    plot_episode: bool = False,
+    record_video: bool = False,
 ) -> gym.Env:
     env = ea.TransverseTuning(
-        backend="cheetah",
-        backend_args={
-            "incoming_mode": config["incoming_mode"],
-            "misalignment_mode": config["misalignment_mode"],
-            "max_misalignment": config["max_misalignment"],
-            "generate_screen_images": plot_episode,
-        },
-        action_mode=config["action_mode"],
-        magnet_init_mode=config["magnet_init_mode"],
-        max_quad_setting=config["max_quad_setting"],
-        max_quad_delta=config["max_quad_delta"],
-        max_steerer_delta=config["max_steerer_delta"],
-        target_beam_mode=config["target_beam_mode"],
-        target_threshold=config["target_threshold"],
-        threshold_hold=config["threshold_hold"],
-        clip_magnets=config["clip_magnets"],
-        beam_param_transform=config["beam_param_transform"],
-        beam_param_combiner=config["beam_param_combiner"],
-        beam_param_combiner_args=config["beam_param_combiner_args"],
-        beam_param_combiner_weights=config["beam_param_combiner_weights"],
-        magnet_change_transform=config["magnet_change_transform"],
-        magnet_change_combiner=config["magnet_change_combiner"],
-        magnet_change_combiner_args=config["magnet_change_combiner_args"],
-        magnet_change_combiner_weights=config["magnet_change_combiner_weights"],
-        final_combiner=config["final_combiner"],
-        final_combiner_args=config["final_combiner_args"],
-        final_combiner_weights=config["final_combiner_weights"],
-        render_mode="rgb_array",
+        **config,
     )
-    env = TimeLimit(env, config["max_episode_steps"])
+    env = TimeLimit(env, wrapper_config["max_episode_steps"])
     if plot_episode:
+        env.unwrapped.backend.generate_screen_images = True
+        run_name = wrapper_config.get("run_name", "default_run")
         env = PlotEpisode(
             env,
-            save_dir=f"plots/{config['run_name']}",
+            save_dir=f"plots/{run_name}",
             episode_trigger=lambda x: x % 5 == 0,  # Once per (5x) evaluation
             log_to_wandb=True,
         )
     if log_task_statistics:
         env = LogTaskStatistics(env)
-    if config["normalize_observation"] and not config["running_obs_norm"]:
+    if (
+        wrapper_config["normalize_observation"]
+        and not wrapper_config["running_obs_norm"]
+    ):
         env = RescaleObservation(env, 0, 1)
-    if config["rescale_action"]:
+    if wrapper_config["rescale_action"]:
         env = RescaleAction(env, 0, 1)
     env = FilterObservation(env, ["beam"])
     env = FlattenObservation(env)

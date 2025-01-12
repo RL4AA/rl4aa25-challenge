@@ -608,7 +608,7 @@ class GpMpcController(BaseControllerObject):
             gradients_dcost_dactions.flatten().detach().numpy(),
         )
 
-    def compute_action(self, obs_mu, obs_var=None):
+    def compute_action(self, obs_mu, obs_var=None, wait_for_training=False):
         """
         Get the optimal action given the observation by optimizing
         the actions of the simulated trajectory with the gaussian process models
@@ -662,6 +662,8 @@ class GpMpcController(BaseControllerObject):
         """
         # Check for parallel process that are open but not alive at each iteration
         # to retrieve the results and close them
+        if "p_train" in self.__dict__:
+            self.p_train.join()
         self.check_and_close_processes()
         torch.set_num_threads(self.num_cores_main)
 
@@ -813,6 +815,7 @@ class GpMpcController(BaseControllerObject):
         check_storage=True,
         predicted_state=None,
         predicted_state_std=None,
+        wait_for_training=False,
     ):
         """
         Add an observation, action and observation after applying the action to the
@@ -915,7 +918,11 @@ class GpMpcController(BaseControllerObject):
                 ),
             )
             self.p_train.start()
-            self.num_cores_main -= 1
+            self.num_cores_main -= self.num_cores_train
+
+            if wait_for_training:
+                self.p_train.join()
+            # self.num_cores_main += self.num_cores_train
 
     @staticmethod
     def train(
@@ -1128,8 +1135,8 @@ class GpMpcController(BaseControllerObject):
 
     def check_and_close_processes(self):
         """
-        Check active parallel processes, wait for their resolution, get the parameters
-        and close them
+        Check opened parallel processes, if the process is finished but not closed,
+        wait for their resolution, get the parameters and close them
         """
         if (
             "p_train" in self.__dict__
@@ -1144,4 +1151,4 @@ class GpMpcController(BaseControllerObject):
             self.iK, self.beta = self.calculate_factorizations(
                 self.x[self.idxs_mem_gp], self.y[self.idxs_mem_gp], self.models
             )
-            self.num_cores_main += 1
+            self.num_cores_main += self.num_cores_train
