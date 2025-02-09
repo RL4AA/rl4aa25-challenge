@@ -23,9 +23,10 @@ class GpMpcController(BaseControllerObject):
         action_space,
         params_dict,
         cost_function: BaseCostFunction,
+        verbose: bool = False,
     ):
         params_dict = self.preprocess_params(params_dict)
-
+        self.verbose = verbose
         self.cost_function = cost_function
 
         self.weight_matrix_cost = torch.block_diag(
@@ -63,10 +64,18 @@ class GpMpcController(BaseControllerObject):
 
         BaseControllerObject.__init__(self, observation_space, action_space)
 
-        self.error_pred_memory = params_dict["memory"][
+        # Reduce the amount of data in memory if they are too close to each other
+        self.min_error_state_memory = params_dict.get("memory", {}).get(
+            "min_error_prediction_state_for_memory", 1e-20
+        )
+        self.min_error_std_memory = params_dict.get("memory", {}).get(
+            "min_prediction_state_std_for_memory", 1e-20
+        )
+
+        self.min_error_state_memory = params_dict["memory"][
             "min_error_prediction_state_for_memory"
         ]
-        self.std_pred_memory = params_dict["memory"][
+        self.min_error_std_memory = params_dict["memory"][
             "min_prediction_state_std_for_memory"
         ]
 
@@ -752,10 +761,11 @@ class GpMpcController(BaseControllerObject):
         )
 
         time_end_optim = time.time()
-        print(
-            "Optimisation time for iteration: %.3f s"
-            % (time_end_optim - time_start_optim)
-        )
+        if self.verbose:
+            print(
+                "Optimisation time for iteration: %.3f s"
+                % (time_end_optim - time_start_optim)
+            )
 
         actions_norm = res.x.reshape(self.len_horizon, -1)
         # prepare init values for the next iteration
@@ -831,20 +841,21 @@ class GpMpcController(BaseControllerObject):
                 applying the action on the observation. Dim=(Ns,)
                 reward (float): reward obtained from the gym env. Unused at the moment.
                     The cost given state and action is computed instead.
-                check_storage (bool): If check_storage is true, predicted_state and
-                    predicted_state_std will be checked (if not None) to know weither
+                check_storage (bool): If `check_storage` is True, `predicted_state` and
+                    `predicted_state_std` will be checked (if not None) to know weither
                     to store the point in memory or not.
 
                 predicted_state (numpy.array or torch.Tensor or None):
-                    if check_storage is True and predicted_state is not None,
+                    if `check_storage` is True and `predicted_state` is not None,
                     the prediction error for that point will be computed.
-                    and the point will only be stored in memory if the
-                    prediction error is larger than self.error_pred_memory. Dim=(Ns,)
+                    T point will only be stored in memory if the
+                    prediction error is larger than `self.min_error_state_memory`.
+                    Dim=(Ns,)
 
                 predicted_state_std (numpy.array or torch.Tensor or None):
-                    If check_storage is true, and predicted_state_std is not None, the
-                    point will only be stored in memory if it is larger than
-                    `self.error_pred_memory`. Dim=(Ns,)
+                    If `check_storage` is true, and `predicted_state_std` is not None,
+                    the point will only be stored in memory if it is larger than
+                    `self.min_error_std_memory`. Dim=(Ns,)
 
                 where Ns: dimension of states, Na: dimension of actions
         """
@@ -880,10 +891,12 @@ class GpMpcController(BaseControllerObject):
         if check_storage:
             if predicted_state is not None:
                 error_prediction = torch.abs(predicted_state - obs_new_norm)
-                store_gp_mem = torch.any(error_prediction > self.error_pred_memory)
+                store_gp_mem = torch.any(error_prediction > self.min_error_state_memory)
 
             if predicted_state_std is not None and store_gp_mem:
-                store_gp_mem = torch.any(predicted_state_std > self.std_pred_memory)
+                store_gp_mem = torch.any(
+                    predicted_state_std > self.min_error_std_memory
+                )
 
         if store_gp_mem:
             self.idxs_mem_gp.append(self.len_mem)
@@ -915,6 +928,7 @@ class GpMpcController(BaseControllerObject):
                     self.print_train,
                     self.step_print_train,
                     self.num_cores_train,
+                    self.verbose,
                 ),
             )
             self.p_train.start()
@@ -937,6 +951,7 @@ class GpMpcController(BaseControllerObject):
         print_train=False,
         step_print_train=25,
         num_cores_train=1,
+        verbose=False,
     ):
         """
         Train the gaussian process models hyper-parameters such that the marginal-log
@@ -1101,23 +1116,28 @@ class GpMpcController(BaseControllerObject):
             except Exception as e:
                 print(e)
 
+            if verbose:
+                print(
+                    "training process - model %d - time train %f - output_scale: %s "
+                    "- lengthscales: %s - noise: %s"
+                    % (
+                        model_idx,
+                        time.time() - start_time,
+                        str(best_outputscales[model_idx].detach().numpy()),
+                        str(best_lengthscales[model_idx].detach().numpy()),
+                        str(best_noises[model_idx].detach().numpy()),
+                    )
+                )
+
+        if verbose:
             print(
-                "training process - model %d - time train %f - output_scale: %s "
-                "- lengthscales: %s - noise: %s"
+                "training process - previous marginal log likelihood: %s "
+                "- new marginal log likelihood: %s"
                 % (
-                    model_idx,
-                    time.time() - start_time,
-                    str(best_outputscales[model_idx].detach().numpy()),
-                    str(best_lengthscales[model_idx].detach().numpy()),
-                    str(best_noises[model_idx].detach().numpy()),
+                    str(previous_losses.detach().numpy()),
+                    str(best_losses.detach().numpy()),
                 )
             )
-
-        print(
-            "training process - previous marginal log likelihood: %s "
-            "- new marginal log likelihood: %s"
-            % (str(previous_losses.detach().numpy()), str(best_losses.detach().numpy()))
-        )
         params_dict_list = []
         for model_idx in range(len(models)):
             params_dict_list.append(
