@@ -468,6 +468,21 @@ class TransverseTuning(gym.Env):
         else:
             return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+    def get_beam_difference(self, metric: str = "mae") -> float:
+        """
+        Compute the difference between the current beam and the target beam.
+
+        :param metric: Metric to compute the difference. Can be `"mae"` for the mean
+            absolute error, `"mse"` for the mean squared error.
+        """
+        current_beam = self.backend.get_beam_parameters()
+        target_beam = self._target_beam
+
+        if metric == "mae":
+            return np.mean(np.abs(current_beam - target_beam))
+        elif metric == "mse":
+            return np.mean((current_beam - target_beam) ** 2)
+
     @property
     def action_names(self):
         return ["Q1", "Q2", "CV", "Q3", "CH"]
