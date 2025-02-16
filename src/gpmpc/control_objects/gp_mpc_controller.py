@@ -112,16 +112,8 @@ class GpMpcController(BaseControllerObject):
                 low=0, high=1, size=(self.len_horizon, self.num_actions)
             )
 
-        self.models = create_models(
-            train_inputs=None,
-            train_targets=None,
-            params=params_dict["gp_init"],
-            constraints_gp=self.gp_constraints,
-            num_models=self.obs_space.shape[0],
-            num_inputs=self.num_inputs,
-        )
-        for idx_model in range(len(self.models)):
-            self.models[idx_model].eval()
+        self.gp_init_params = params_dict["gp_init"]
+        self.models = None
 
         self.num_cores_main = multiprocessing.cpu_count()
         self.num_cores_train = min(
@@ -904,6 +896,12 @@ class GpMpcController(BaseControllerObject):
         self.len_mem += 1
         self.n_iter_obs += 1
 
+        self.gp_init_params = (
+            [model.state_dict() for model in self.models]
+            if self.models is not None
+            else self.gp_init_params
+        )
+
         if self.len_mem % self.training_frequency == 0 and not (
             "p_train" in self.__dict__ and not self.p_train._closed
         ):
@@ -920,7 +918,7 @@ class GpMpcController(BaseControllerObject):
                     self.queue_train,
                     self.x[self.idxs_mem_gp],
                     self.y[self.idxs_mem_gp],
-                    [model.state_dict() for model in self.models],
+                    self.gp_init_params,
                     self.gp_constraints,
                     self.lr_train,
                     self.iter_train,
@@ -1138,6 +1136,7 @@ class GpMpcController(BaseControllerObject):
                     str(best_losses.detach().numpy()),
                 )
             )
+
         params_dict_list = []
         for model_idx in range(len(models)):
             params_dict_list.append(
@@ -1165,6 +1164,12 @@ class GpMpcController(BaseControllerObject):
         ):
             params_dict_list = self.queue_train.get()
             self.p_train.join()
+            self.models = create_models(
+                self.x[self.idxs_mem_gp],
+                self.y[self.idxs_mem_gp],
+                self.gp_init_params,
+                constraints_gp=self.gp_constraints,
+            )
             for model_idx in range(len(self.models)):
                 self.models[model_idx].initialize(**params_dict_list[model_idx])
             self.p_train.close()

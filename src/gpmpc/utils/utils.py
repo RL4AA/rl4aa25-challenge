@@ -55,11 +55,9 @@ def create_models(
         memory, constraints of the gps and functions for exact predictions
     """
     if train_inputs is not None and train_targets is not None:
-        num_models = len(train_targets[0])
+        num_models = train_targets.shape[-1]
         models = [
-            ExactGPModelMonoTask(
-                train_inputs, train_targets[:, idx_model], len(train_inputs[0])
-            )
+            ExactGPModelMonoTask(train_inputs, train_targets[:, idx_model])
             for idx_model in range(num_models)
         ]
     else:
@@ -147,6 +145,7 @@ def create_models(
             models[idx_model].covar_module.initialize(**hypers)
         elif isinstance(params, list):
             models[idx_model].load_state_dict(params[idx_model])
+            # models[idx_model].initialize(**params[idx_model])
     return models
 
 
