@@ -37,7 +37,7 @@ env_wrapper:
   running_obs_norm: false
   normalize_reward: false  # Not really needed because normalised by design
   rescale_action: true
-  max_episode_steps: 100
+  max_episode_steps: 150
 
 # Gaussian Process Initialization Parameters
 gp_init:
