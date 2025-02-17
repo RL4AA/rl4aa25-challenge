@@ -60,17 +60,18 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
 
         self.ax1.set_title("Trajectories for Each Episode")
         self.ax1.set_xlabel("Cumulative Step")
-        self.ax1.set_ylabel("State Value")
+        self.ax1.set_ylabel("Normalized State Value")
         self.ax1.grid()
 
         self.ax2.set_title("Actions for Each Episode")
         self.ax2.set_xlabel("Cumulative Step")
-        self.ax2.set_ylabel("Action Value")
+        self.ax2.set_ylabel("Normalized Action Value")
         self.ax2.grid()
 
         self.ax3.set_title("MAEs for Each Episode")
         self.ax3.set_xlabel("Cumulative Step")
         self.ax3.set_ylabel("MAE (mm)")
+        self.ax3.set_yscale("log")
         self.ax3.grid()
 
         # Update legends
@@ -78,8 +79,11 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
             Line2D([], [], color=self.colors_states[i], label=f"State {i + 1}")
             for i in range(self.n_states)
         ]
+
+        action_names = self.env.get_wrapper_attr("action_names")
+
         legend_handles_actions = [
-            Line2D([], [], color=self.colors_actions[i], label=f"Action {i + 1}")
+            Line2D([], [], color=self.colors_actions[i], label=action_names[i])
             for i in range(self.n_actions)
         ]
 
@@ -129,7 +133,7 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
         return start_step + len(trajectory)
 
     def step(self, action):
-        observation, reward, done, _, info = self.env.step(action)
+        observation, reward, terminated, truncated, info = self.env.step(action)
 
         if self.current_episode is None:
             self.current_episode = EpisodeData()
@@ -137,13 +141,13 @@ class EAMpcEpisodeWithPlotting(gym.Wrapper):
         mae = self._calculate_mae()
         self.current_episode.add_step(observation, action, reward, mae)
 
-        if done:
+        if terminated or truncated:
             self.current_episode.end_episode()
             self.episodes.append(self.current_episode)
             self.current_episode = None
 
         self._update_plots()
-        return observation, reward, done, False, info
+        return observation, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
         observation, info = self.env.reset(**kwargs)

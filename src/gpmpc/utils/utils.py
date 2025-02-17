@@ -2,6 +2,7 @@ import gpytorch
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 from src.gpmpc.control_objects.gp_models import ExactGPModelMonoTask
 
@@ -54,11 +55,9 @@ def create_models(
         memory, constraints of the gps and functions for exact predictions
     """
     if train_inputs is not None and train_targets is not None:
-        num_models = len(train_targets[0])
+        num_models = train_targets.shape[-1]
         models = [
-            ExactGPModelMonoTask(
-                train_inputs, train_targets[:, idx_model], len(train_inputs[0])
-            )
+            ExactGPModelMonoTask(train_inputs, train_targets[:, idx_model])
             for idx_model in range(num_models)
         ]
     else:
@@ -146,6 +145,7 @@ def create_models(
             models[idx_model].covar_module.initialize(**hypers)
         elif isinstance(params, list):
             models[idx_model].load_state_dict(params[idx_model])
+            # models[idx_model].initialize(**params[idx_model])
     return models
 
 
@@ -176,9 +176,32 @@ def init_control(
     obs, _ = env.reset()
     action, cost, obs_prev_ctrl = None, None, None
     done = False
+
+    # Set the target state
+    new_target_state = env.get_wrapper_attr("normalized_target_beam")(
+        min_observation=ctrl_obj.obs_space.low,
+        max_observation=ctrl_obj.obs_space.high,
+    )
+    ctrl_obj.cost_function.set_target_state(torch.tensor(new_target_state))
+
+    # Perform random actions to initialize the memory
     for idx_action in range(random_actions_init):
-        if idx_action % num_repeat_actions == 0 or action is None:
+        if action is None:
             action = env.action_space.sample()
+        elif idx_action % num_repeat_actions == 0:
+            if ctrl_obj.limit_action_change:
+                # Sample action within the limit_action_range
+                delta_action = (
+                    (np.random.rand(*action.shape) - 0.5)
+                    * 2
+                    * ctrl_obj.max_change_action_norm
+                )
+                normed_action = ctrl_obj.to_normed_action_tensor(action) + delta_action
+                normed_action = torch.clamp(normed_action, 0, 1)
+                action = ctrl_obj.denorm_action(normed_action).numpy()
+            else:
+                action = env.action_space.sample()
+
             if obs_prev_ctrl is not None and cost is not None:
                 ctrl_obj.add_memory(
                     obs=obs_prev_ctrl,
@@ -205,9 +228,7 @@ def init_control(
         live_plot_obj.update(obs=obs, action=action, cost=cost, info_dict=None)
 
         # Store the last action for potential future use
-        ctrl_obj.action_previous_iter = (
-            action  # Adjust as needed, e.g., convert to tensor
-        )
+        ctrl_obj.action_previous_iter = torch.tensor(action)
 
     return (
         ctrl_obj,
@@ -349,7 +370,7 @@ class LivePlotSequential:
             for action_idx in range(action_space.shape[0])
         ]
         self.line_costs_pred = self.axes[2].plot(
-            [], [], label="predicted cost", color="k", linestyle="dashed"
+            [], [], label="predicted reward", color="k", linestyle="dashed"
         )
 
         self.axes[0].legend(fontsize=fontsize)

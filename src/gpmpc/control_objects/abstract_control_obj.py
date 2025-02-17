@@ -27,6 +27,6 @@ class BaseControllerObject(ABC):
     def compute_action(self, observation, s_observation):
         pass
 
-    @abstractmethod
-    def train(self):
-        pass
+    # @abstractmethod
+    # def train(self):
+    #     pass

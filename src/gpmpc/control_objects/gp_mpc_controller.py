@@ -1,11 +1,12 @@
 import multiprocessing
 import time
 
-import gpytorch
 import numpy as np
 import torch
 from scipy.optimize import minimize
 
+from src.gpmpc.cost_functions.base_cost import BaseCostFunction
+from src.gpmpc.utils.optim import train_models_torch_optim
 from src.gpmpc.utils.utils import create_models
 
 from .abstract_control_obj import BaseControllerObject
@@ -15,8 +16,19 @@ torch.set_default_dtype(torch.double)
 
 
 class GpMpcController(BaseControllerObject):
-    def __init__(self, observation_space, action_space, params_dict):
+
+    def __init__(
+        self,
+        observation_space,
+        action_space,
+        params_dict,
+        cost_function: BaseCostFunction,
+        verbose: bool = False,
+    ):
         params_dict = self.preprocess_params(params_dict)
+        self.verbose = verbose
+        self.cost_function = cost_function
+
         self.weight_matrix_cost = torch.block_diag(
             torch.diag(params_dict["controller"]["weight_state"]),
             torch.diag(params_dict["controller"]["weight_action"]),
@@ -52,10 +64,18 @@ class GpMpcController(BaseControllerObject):
 
         BaseControllerObject.__init__(self, observation_space, action_space)
 
-        self.error_pred_memory = params_dict["memory"][
+        # Reduce the amount of data in memory if they are too close to each other
+        self.min_error_state_memory = params_dict.get("memory", {}).get(
+            "min_error_prediction_state_for_memory", 1e-20
+        )
+        self.min_error_std_memory = params_dict.get("memory", {}).get(
+            "min_prediction_state_std_for_memory", 1e-20
+        )
+
+        self.min_error_state_memory = params_dict["memory"][
             "min_error_prediction_state_for_memory"
         ]
-        self.std_pred_memory = params_dict["memory"][
+        self.min_error_std_memory = params_dict["memory"][
             "min_prediction_state_std_for_memory"
         ]
 
@@ -92,18 +112,14 @@ class GpMpcController(BaseControllerObject):
                 low=0, high=1, size=(self.len_horizon, self.num_actions)
             )
 
-        self.models = create_models(
-            train_inputs=None,
-            train_targets=None,
-            params=params_dict["gp_init"],
-            constraints_gp=self.gp_constraints,
-            num_models=self.obs_space.shape[0],
-            num_inputs=self.num_inputs,
-        )
-        for idx_model in range(len(self.models)):
-            self.models[idx_model].eval()
+        self.gp_init_params = params_dict["gp_init"]
+        self.models = None
 
         self.num_cores_main = multiprocessing.cpu_count()
+        self.num_cores_train = min(
+            self.num_cores_main - 1, params_dict["train"]["num_cores_train"]
+        )
+
         self.ctx = multiprocessing.get_context("spawn")
         # self.ctx = multiprocessing.get_context('fork')
         self.queue_train = self.ctx.Queue()
@@ -236,114 +252,6 @@ class GpMpcController(BaseControllerObject):
         )
         return action
 
-    def compute_cost(self, state_mu, state_var, action):
-        """
-        Compute the quadratic cost of one state distribution or a trajectory of states
-        distributions given the mean value and variance of states (observations), the
-        weight matrix, and target state.
-        The state, state_var and action must be normalized.
-        If reading directly from the gym env observation,
-        this can be done with the gym env action space and observation space.
-        See an example of normalization in the add_points_memory function.
-        Args:
-            state_mu (torch.Tensor): normed mean value of the state or observation
-                distribution (elements between 0 and 1). dim=(Ns) or dim=(Np, Ns)
-            state_var (torch.Tensor): normed variance matrix of the state or
-            observation distribution (elements between 0 and 1)
-                dim=(Ns, Ns) or dim=(Np, Ns, Ns)
-            action (torch.Tensor): normed actions. (elements between 0 and 1).
-                dim=(Na) or dim=(Np, Na)
-
-            Np: length of the prediction trajectory. (=self.len_horizon)
-            Na: dimension of the gym environment actions
-            Ns: dimension of the gym environment states
-
-        Returns:
-            cost_mu (torch.Tensor): mean value of the cost distribution.
-                dim=(1) or dim=(Np)
-            cost_var (torch.Tensor): variance of the cost distribution.
-                dim=(1) or dim=(Np)
-        """
-
-        if state_var.ndim == 3:
-            error = torch.cat((state_mu, action), 1) - self.target_state_action_norm
-            state_action_var = torch.cat(
-                (
-                    torch.cat(
-                        (
-                            state_var,
-                            torch.zeros(
-                                (
-                                    state_var.shape[0],
-                                    state_var.shape[1],
-                                    action.shape[1],
-                                )
-                            ),
-                        ),
-                        2,
-                    ),
-                    torch.zeros(
-                        (
-                            state_var.shape[0],
-                            action.shape[1],
-                            state_var.shape[1] + action.shape[1],
-                        )
-                    ),
-                ),
-                1,
-            )
-        else:
-            error = torch.cat((state_mu, action), 0) - self.target_state_action_norm
-            state_action_var = torch.block_diag(
-                state_var, torch.zeros((action.shape[0], action.shape[0]))
-            )
-        cost_mu = (
-            torch.diagonal(
-                torch.matmul(state_action_var, self.weight_matrix_cost),
-                dim1=-1,
-                dim2=-2,
-            ).sum(-1)
-            + torch.matmul(
-                torch.matmul(
-                    error[..., None].transpose(-1, -2), self.weight_matrix_cost
-                ),
-                error[..., None],
-            ).squeeze()
-        )
-        TS = self.weight_matrix_cost @ state_action_var
-        cost_var_term1 = torch.diagonal(2 * TS @ TS, dim1=-1, dim2=-2).sum(-1)
-        cost_var_term2 = TS @ self.weight_matrix_cost
-        cost_var_term3 = (
-            4 * error[..., None].transpose(-1, -2) @ cost_var_term2 @ error[..., None]
-        ).squeeze()
-        cost_var = cost_var_term1 + cost_var_term3
-        return cost_mu, cost_var
-
-    def compute_cost_terminal(self, state_mu, state_var):
-        """
-        Compute the terminal cost of the prediction trajectory.
-        Args:
-            state_mu (torch.Tensor): mean value of the terminal state distribution.
-                dim=(Ns)
-            state_var (torch.Tensor): variance matrix of the terminal state
-                distribution. dim=(Ns, Ns)
-
-        Returns:
-            cost_mu (torch.Tensor): mean value of the cost distribution. dim=(1)
-            cost_var (torch.Tensor): variance of the cost distribution. dim=(1)
-        """
-        error = state_mu - self.target_state_norm
-        cost_mu = torch.trace(
-            torch.matmul(state_var, self.weight_matrix_cost_terminal)
-        ) + torch.matmul(
-            torch.matmul(error.t(), self.weight_matrix_cost_terminal), error
-        )
-        TS = self.weight_matrix_cost_terminal @ state_var
-        cost_var_term1 = torch.trace(2 * TS @ TS)
-        cost_var_term2 = 4 * error.t() @ TS @ self.weight_matrix_cost_terminal @ error
-        cost_var = cost_var_term1 + cost_var_term2
-        return cost_mu, cost_var
-
     def compute_cost_unnormalized(self, obs, action, obs_var=None):
         """
         Compute the cost on un-normalized state and actions.
@@ -366,7 +274,9 @@ class GpMpcController(BaseControllerObject):
             obs_var_norm = self.obs_var_norm
         else:
             obs_var_norm = self.to_normed_var_tensor(obs_var)
-        cost_mu, cost_var = self.compute_cost(obs_norm, obs_var_norm, action_norm)
+        cost_mu, cost_var = self.cost_function(
+            obs_norm, obs_var_norm, action_norm, terminal=False
+        )
         return cost_mu.item(), cost_var.item()
 
     @staticmethod
@@ -597,11 +507,11 @@ class GpMpcController(BaseControllerObject):
                 + v.t() @ input_var[: states_var_pred.shape[1]].t()
             )
 
-        costs_traj, costs_traj_var = self.compute_cost(
-            states_mu_pred[:-1], states_var_pred[:-1], actions
+        costs_traj, costs_traj_var = self.cost_function(
+            states_mu_pred[:-1], states_var_pred[:-1], actions, terminal=False
         )
-        cost_traj_final, costs_traj_var_final = self.compute_cost_terminal(
-            states_mu_pred[-1], states_var_pred[-1]
+        cost_traj_final, costs_traj_var_final = self.cost_function(
+            states_mu_pred[-1], states_var_pred[-1], terminal=True
         )
         costs_traj = torch.cat((costs_traj, cost_traj_final[None]), 0)
         costs_traj_var = torch.cat((costs_traj_var, costs_traj_var_final[None]), 0)
@@ -699,7 +609,7 @@ class GpMpcController(BaseControllerObject):
             gradients_dcost_dactions.flatten().detach().numpy(),
         )
 
-    def compute_action(self, obs_mu, obs_var=None):
+    def compute_action(self, obs_mu, obs_var=None, wait_for_training=False):
         """
         Get the optimal action given the observation by optimizing
         the actions of the simulated trajectory with the gaussian process models
@@ -753,6 +663,8 @@ class GpMpcController(BaseControllerObject):
         """
         # Check for parallel process that are open but not alive at each iteration
         # to retrieve the results and close them
+        if "p_train" in self.__dict__:
+            self.p_train.join()
         self.check_and_close_processes()
         torch.set_num_threads(self.num_cores_main)
 
@@ -841,10 +753,11 @@ class GpMpcController(BaseControllerObject):
         )
 
         time_end_optim = time.time()
-        print(
-            "Optimisation time for iteration: %.3f s"
-            % (time_end_optim - time_start_optim)
-        )
+        if self.verbose:
+            print(
+                "Optimisation time for iteration: %.3f s"
+                % (time_end_optim - time_start_optim)
+            )
 
         actions_norm = res.x.reshape(self.len_horizon, -1)
         # prepare init values for the next iteration
@@ -862,8 +775,8 @@ class GpMpcController(BaseControllerObject):
             actions_norm = torch.Tensor(actions_norm)
             action = self.denorm_action(action_next)
 
-            cost, cost_var = self.compute_cost(
-                obs_mu_normed, obs_var_norm, actions_norm[0]
+            cost, cost_var = self.cost_function(
+                obs_mu_normed, obs_var_norm, actions_norm[0], terminal=False
             )
             # states_denorm = self.states_mu_pred[1:] * \
             # (self.observation_space.high - self.observation_space.low) + \
@@ -883,9 +796,7 @@ class GpMpcController(BaseControllerObject):
                 "cost std": cost_var.sqrt().item(),
                 "predicted costs": self.costs_trajectory[1:],
                 "predicted costs std": self.costs_traj_var[1:].sqrt(),
-                "mean predicted cost": np.min(
-                    [self.costs_trajectory[1:].mean().item(), 3]
-                ),
+                "mean predicted cost": self.costs_trajectory[1:].mean().item(),
                 "mean predicted cost std": self.costs_traj_var[1:].sqrt().mean().item(),
                 "lower bound mean predicted cost": self.cost_traj_mean_lcb.item(),
             }
@@ -906,6 +817,7 @@ class GpMpcController(BaseControllerObject):
         check_storage=True,
         predicted_state=None,
         predicted_state_std=None,
+        wait_for_training=False,
     ):
         """
         Add an observation, action and observation after applying the action to the
@@ -921,20 +833,21 @@ class GpMpcController(BaseControllerObject):
                 applying the action on the observation. Dim=(Ns,)
                 reward (float): reward obtained from the gym env. Unused at the moment.
                     The cost given state and action is computed instead.
-                check_storage (bool): If check_storage is true, predicted_state and
-                    predicted_state_std will be checked (if not None) to know weither
+                check_storage (bool): If `check_storage` is True, `predicted_state` and
+                    `predicted_state_std` will be checked (if not None) to know weither
                     to store the point in memory or not.
 
                 predicted_state (numpy.array or torch.Tensor or None):
-                    if check_storage is True and predicted_state is not None,
+                    if `check_storage` is True and `predicted_state` is not None,
                     the prediction error for that point will be computed.
-                    and the point will only be stored in memory if the
-                    prediction error is larger than self.error_pred_memory. Dim=(Ns,)
+                    T point will only be stored in memory if the
+                    prediction error is larger than `self.min_error_state_memory`.
+                    Dim=(Ns,)
 
                 predicted_state_std (numpy.array or torch.Tensor or None):
-                    If check_storage is true, and predicted_state_std is not None, the
-                    point will only be stored in memory if it is larger than
-                    `self.error_pred_memory`. Dim=(Ns,)
+                    If `check_storage` is true, and `predicted_state_std` is not None,
+                    the point will only be stored in memory if it is larger than
+                    `self.min_error_std_memory`. Dim=(Ns,)
 
                 where Ns: dimension of states, Na: dimension of actions
         """
@@ -961,6 +874,8 @@ class GpMpcController(BaseControllerObject):
         self.y[self.len_mem] = obs_new_norm - obs_norm
         self.rewards[self.len_mem] = reward
 
+        # Store the last action
+        self.action_previous_iter = action_norm
         # if self.include_time_gp:
         #     self.x[self.len_mem, -1] = self.n_iter_obs
 
@@ -968,16 +883,24 @@ class GpMpcController(BaseControllerObject):
         if check_storage:
             if predicted_state is not None:
                 error_prediction = torch.abs(predicted_state - obs_new_norm)
-                store_gp_mem = torch.any(error_prediction > self.error_pred_memory)
+                store_gp_mem = torch.any(error_prediction > self.min_error_state_memory)
 
             if predicted_state_std is not None and store_gp_mem:
-                store_gp_mem = torch.any(predicted_state_std > self.std_pred_memory)
+                store_gp_mem = torch.any(
+                    predicted_state_std > self.min_error_std_memory
+                )
 
         if store_gp_mem:
             self.idxs_mem_gp.append(self.len_mem)
 
         self.len_mem += 1
         self.n_iter_obs += 1
+
+        self.gp_init_params = (
+            [model.state_dict() for model in self.models]
+            if self.models is not None
+            else self.gp_init_params
+        )
 
         if self.len_mem % self.training_frequency == 0 and not (
             "p_train" in self.__dict__ and not self.p_train._closed
@@ -990,235 +913,33 @@ class GpMpcController(BaseControllerObject):
             #            self.print_train, self.step_print_train)
 
             self.p_train = self.ctx.Process(
-                target=self.train,
+                target=train_models_torch_optim,
                 args=(
                     self.queue_train,
                     self.x[self.idxs_mem_gp],
                     self.y[self.idxs_mem_gp],
-                    [model.state_dict() for model in self.models],
+                    self.gp_init_params,
                     self.gp_constraints,
                     self.lr_train,
                     self.iter_train,
                     self.clip_grad_value,
                     self.print_train,
                     self.step_print_train,
+                    self.num_cores_train,
+                    self.verbose,
                 ),
             )
             self.p_train.start()
-            self.num_cores_main -= 1
+            self.num_cores_main -= self.num_cores_train
 
-    @staticmethod
-    def train(
-        queue,
-        train_inputs,
-        train_targets,
-        parameters,
-        constraints_hyperparams,
-        lr_train,
-        num_iter_train,
-        clip_grad_value,
-        print_train=False,
-        step_print_train=25,
-    ):
-        """
-        Train the gaussian process models hyper-parameters such that the marginal-log
-        likelihood for the predictions of the points in memory is minimized.
-        This function is launched in parallel of the main process, which is why a queue
-        is used to transfer information back to the main process and why the gaussian
-        process models are reconstructed using the points in memory and hyper-parameters
-        (they cant be sent directly as argument).
-        If an error occurs, returns the parameters sent as init values
-        (hyper-parameters obtained by the previous training process)
-        Args:
-                queue (multiprocessing.queues.Queue): queue object used to transfer
-                information to the main process
-
-                train_inputs (torch.Tensor): input data-points of the gaussian process
-                models (concat(obs, actions)). Dim=(Np, Ns + Na)
-
-                train_targets (torch.Tensor): targets data-points of the gaussian
-                process models (obs_new - obs). Dim=(Np, Ns)
-
-                parameters (list of OrderedDict): contains the hyper-parameters of the
-                models used as init values. They are obtained by using
-                [model.state_dict() for model in models] where models is a list
-                containing gaussian process models of the gpytorch library:
-                gpytorch.models.ExactGP
-
-                constraints_hyperparams (dict): Constraints on the hyper-parameters.
-                    See parameters.md for more information
-
-                lr_train (float): learning rate of the training
-
-                num_iter_train (int): number of iteration for the training optimizer
-
-                clip_grad_value (float): value at which the gradient are clipped,
-                    so that the training is more stable
-
-                print_train (bool): weither to print the information during training.
-                    default=False
-
-                step_print_train (int): If print_train is True, only print the
-                    information every step_print_train iteration
-        """
-
-        torch.set_num_threads(1)
-        start_time = time.time()
-        # create models, which is necessary since this function is used in a parallel
-        # process that do not share memory with the principal process
-        models = create_models(
-            train_inputs, train_targets, parameters, constraints_hyperparams
-        )
-        best_outputscales = [
-            model.covar_module.outputscale.detach() for model in models
-        ]
-        best_noises = [model.likelihood.noise.detach() for model in models]
-        best_lengthscales = [
-            model.covar_module.base_kernel.lengthscale.detach() for model in models
-        ]
-        previous_losses = torch.empty(len(models))
-
-        for model_idx in range(len(models)):
-            output = models[model_idx](models[model_idx].train_inputs[0])
-            mll = gpytorch.mlls.ExactMarginalLogLikelihood(
-                models[model_idx].likelihood, models[model_idx]
-            )
-            previous_losses[model_idx] = -mll(output, models[model_idx].train_targets)
-
-        best_losses = previous_losses.detach().clone()
-        # Random initialization of the parameters showed better performance than
-        # just taking the value from the previous iteration as init values.
-        # If parameters found at the end do not better performance than previous iter,
-        # return previous parameters
-        for model_idx in range(len(models)):
-            models[model_idx].covar_module.outputscale = models[
-                model_idx
-            ].covar_module.raw_outputscale_constraint.lower_bound + torch.rand(
-                models[model_idx].covar_module.outputscale.shape
-            ) * (
-                models[model_idx].covar_module.raw_outputscale_constraint.upper_bound
-                - models[model_idx].covar_module.raw_outputscale_constraint.lower_bound
-            )
-
-            models[model_idx].covar_module.base_kernel.lengthscale = models[
-                model_idx
-            ].covar_module.base_kernel.raw_lengthscale_constraint.lower_bound + (
-                models[
-                    model_idx
-                ].covar_module.base_kernel.raw_lengthscale_constraint.upper_bound
-                - models[
-                    model_idx
-                ].covar_module.base_kernel.raw_lengthscale_constraint.lower_bound
-            ) * torch.rand(
-                models[model_idx].covar_module.base_kernel.lengthscale.shape
-            )
-
-            models[model_idx].likelihood.noise = models[
-                model_idx
-            ].likelihood.noise_covar.raw_noise_constraint.lower_bound + torch.rand(
-                models[model_idx].likelihood.noise.shape
-            ) * (
-                models[
-                    model_idx
-                ].likelihood.noise_covar.raw_noise_constraint.upper_bound
-                - models[
-                    model_idx
-                ].likelihood.noise_covar.raw_noise_constraint.lower_bound
-            )
-            mll = gpytorch.mlls.ExactMarginalLogLikelihood(
-                models[model_idx].likelihood, models[model_idx]
-            )
-            models[model_idx].train()
-            models[model_idx].likelihood.train()
-            optimizer = torch.optim.LBFGS(
-                [
-                    {
-                        "params": models[model_idx].parameters()
-                    },  # Includes GaussianLikelihood parameters
-                ],
-                lr=lr_train,
-                line_search_fn="strong_wolfe",
-            )
-            try:
-                for i in range(num_iter_train):
-
-                    def closure():
-                        optimizer.zero_grad()
-                        # Output from the model
-                        output = models[model_idx](models[model_idx].train_inputs[0])
-                        # Calculate loss and backpropagation gradients
-                        loss = -mll(output, models[model_idx].train_targets)
-                        loss.backward()
-                        torch.nn.utils.clip_grad_value_(
-                            models[model_idx].parameters(), clip_grad_value
-                        )
-                        return loss
-
-                    loss = optimizer.step(closure)
-                    if print_train and i % step_print_train == 0:
-                        lengthscale = (
-                            models[model_idx]
-                            .covar_module.base_kernel.lengthscale.detach()
-                            .numpy()
-                        )
-                        print(
-                            f"Iter {i + 1}/{num_iter_train} - \nLoss: {loss.item():.5f}"
-                            "   output_scale: "
-                            f"{models[model_idx].covar_module.outputscale.item():.5f}"
-                            f"   lengthscale: {str(lengthscale)}"
-                            "    noise: "
-                            f"{models[model_idx].likelihood.noise.item() ** 0.5:.5f}"
-                        )
-
-                    if loss < best_losses[model_idx]:
-                        best_losses[model_idx] = loss.item()
-                        best_lengthscales[model_idx] = models[
-                            model_idx
-                        ].covar_module.base_kernel.lengthscale
-                        best_noises[model_idx] = models[model_idx].likelihood.noise
-                        best_outputscales[model_idx] = models[
-                            model_idx
-                        ].covar_module.outputscale
-
-            except Exception as e:
-                print(e)
-
-            print(
-                "training process - model %d - time train %f - output_scale: %s "
-                "- lengthscales: %s - noise: %s"
-                % (
-                    model_idx,
-                    time.time() - start_time,
-                    str(best_outputscales[model_idx].detach().numpy()),
-                    str(best_lengthscales[model_idx].detach().numpy()),
-                    str(best_noises[model_idx].detach().numpy()),
-                )
-            )
-
-        print(
-            "training process - previous marginal log likelihood: %s "
-            "- new marginal log likelihood: %s"
-            % (str(previous_losses.detach().numpy()), str(best_losses.detach().numpy()))
-        )
-        params_dict_list = []
-        for model_idx in range(len(models)):
-            params_dict_list.append(
-                {
-                    "covar_module.base_kernel.lengthscale": best_lengthscales[model_idx]
-                    .detach()
-                    .numpy(),
-                    "covar_module.outputscale": best_outputscales[model_idx]
-                    .detach()
-                    .numpy(),
-                    "likelihood.noise": best_noises[model_idx].detach().numpy(),
-                }
-            )
-        queue.put(params_dict_list)
+            if wait_for_training:
+                self.p_train.join()
+            # self.num_cores_main += self.num_cores_train
 
     def check_and_close_processes(self):
         """
-        Check active parallel processes, wait for their resolution, get the parameters
-        and close them
+        Check opened parallel processes, if the process is finished but not closed,
+        wait for their resolution, get the parameters and close them
         """
         if (
             "p_train" in self.__dict__
@@ -1227,10 +948,16 @@ class GpMpcController(BaseControllerObject):
         ):
             params_dict_list = self.queue_train.get()
             self.p_train.join()
+            self.models = create_models(
+                self.x[self.idxs_mem_gp],
+                self.y[self.idxs_mem_gp],
+                self.gp_init_params,
+                constraints_gp=self.gp_constraints,
+            )
             for model_idx in range(len(self.models)):
                 self.models[model_idx].initialize(**params_dict_list[model_idx])
             self.p_train.close()
             self.iK, self.beta = self.calculate_factorizations(
                 self.x[self.idxs_mem_gp], self.y[self.idxs_mem_gp], self.models
             )
-            self.num_cores_main += 1
+            self.num_cores_main += self.num_cores_train
