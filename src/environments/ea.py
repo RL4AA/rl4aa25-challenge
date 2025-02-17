@@ -563,7 +563,7 @@ class CheetahBackend(TransverseTuningBaseBackend):
         # the lattice json file is in the same directory as this file
         self.segment = cheetah.Segment.from_lattice_json(
             os.path.join(os.path.dirname(__file__), "ARES_EA_Cheetah_Lattice.json")
-        )
+        ).to(torch.float32)
 
         self.segment.AREABSCR1.resolution = torch.tensor((2448, 2040))
         self.segment.AREABSCR1.pixel_size = torch.tensor((3.3198e-6, 2.4469e-6))
@@ -636,17 +636,19 @@ class CheetahBackend(TransverseTuningBaseBackend):
             incoming_parameters = self.incoming_beam_space.sample()
 
         self.incoming = cheetah.ParameterBeam.from_parameters(
-            energy=torch.tensor(incoming_parameters[0], dtype=torch.float32),
-            mu_x=torch.tensor(incoming_parameters[1], dtype=torch.float32),
-            mu_xp=torch.tensor(incoming_parameters[2], dtype=torch.float32),
-            mu_y=torch.tensor(incoming_parameters[3], dtype=torch.float32),
-            mu_yp=torch.tensor(incoming_parameters[4], dtype=torch.float32),
-            sigma_x=torch.tensor(incoming_parameters[5], dtype=torch.float32),
-            sigma_xp=torch.tensor(incoming_parameters[6], dtype=torch.float32),
-            sigma_y=torch.tensor(incoming_parameters[7], dtype=torch.float32),
-            sigma_yp=torch.tensor(incoming_parameters[8], dtype=torch.float32),
-            sigma_s=torch.tensor(incoming_parameters[9], dtype=torch.float32),
-            sigma_p=torch.tensor(incoming_parameters[10], dtype=torch.float32),
+            energy=torch.tensor(incoming_parameters[0]),
+            mu_x=torch.tensor(incoming_parameters[1]),
+            mu_px=torch.tensor(incoming_parameters[2]),
+            mu_y=torch.tensor(incoming_parameters[3]),
+            mu_py=torch.tensor(incoming_parameters[4]),
+            sigma_x=torch.tensor(incoming_parameters[5]),
+            sigma_px=torch.tensor(incoming_parameters[6]),
+            sigma_y=torch.tensor(incoming_parameters[7]),
+            sigma_py=torch.tensor(incoming_parameters[8]),
+            sigma_tau=torch.tensor(incoming_parameters[9]),
+            sigma_p=torch.tensor(incoming_parameters[10]),
+            device=None,
+            dtype=torch.float32,
         )
 
         # Set up misalignments
@@ -657,10 +659,18 @@ class CheetahBackend(TransverseTuningBaseBackend):
         elif self.misalignment_mode == "random":
             misalignments = self.misalignment_space.sample()
 
-        self.segment.AREAMQZM1.misalignment = torch.as_tensor(misalignments[0:2])
-        self.segment.AREAMQZM2.misalignment = torch.as_tensor(misalignments[2:4])
-        self.segment.AREAMQZM3.misalignment = torch.as_tensor(misalignments[4:6])
-        self.segment.AREABSCR1.misalignment = torch.as_tensor(misalignments[6:8])
+        self.segment.AREAMQZM1.misalignment = torch.as_tensor(
+            misalignments[0:2], dtype=torch.float32
+        )
+        self.segment.AREAMQZM2.misalignment = torch.as_tensor(
+            misalignments[2:4], dtype=torch.float32
+        )
+        self.segment.AREAMQZM3.misalignment = torch.as_tensor(
+            misalignments[4:6], dtype=torch.float32
+        )
+        self.segment.AREABSCR1.misalignment = torch.as_tensor(
+            misalignments[6:8], dtype=torch.float32
+        )
 
     def _preprocess_reset_options(self, options: dict) -> dict:
         """
@@ -694,14 +704,14 @@ class CheetahBackend(TransverseTuningBaseBackend):
             [
                 self.incoming.energy,
                 self.incoming.mu_x,
-                self.incoming.mu_xp,
+                self.incoming.mu_px,
                 self.incoming.mu_y,
-                self.incoming.mu_yp,
+                self.incoming.mu_py,
                 self.incoming.sigma_x,
-                self.incoming.sigma_xp,
+                self.incoming.sigma_px,
                 self.incoming.sigma_y,
-                self.incoming.sigma_yp,
-                self.incoming.sigma_s,
+                self.incoming.sigma_py,
+                self.incoming.sigma_tau,
                 self.incoming.sigma_p,
             ]
         )

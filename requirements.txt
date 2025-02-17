@@ -1,6 +1,6 @@
 black
 botorch
-cheetah-accelerator==0.6.3  # TODO Replace when fixed
+cheetah-accelerator==0.7.0
 flake8
 gymnasium[other]==1.0.0
 ipympl
