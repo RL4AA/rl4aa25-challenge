@@ -2,9 +2,7 @@ name: test_notebook
 
 on:
   push:
-    branches: [main, prepare-challenge-part1]
-  pull_request:
-    branches: [main]
+    branches: [prepare-challenge-part1]
 
 jobs:
   build:
@@ -28,7 +26,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           miniforge-version: "latest"
-          environment-file: environment.yaml
+          environment-file: environment.yml
       - name: Test the notebook by running it
         run: |
           jupyter execute tutorial.ipynb
