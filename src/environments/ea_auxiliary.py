@@ -1,5 +1,5 @@
 from gymnasium import spaces
-from gymnasium.wrappers import TimeLimit, FlattenObservation, RescaleAction
+from gymnasium.wrappers import FlattenObservation, RescaleAction, TimeLimit
 
 from ..reward import combiners, transforms
 from ..type_aliases import CombinerLiteral, TransformLiteral
