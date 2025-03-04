@@ -1,6 +1,6 @@
 name: rl25-tutorial
 channels:
-  - conda-forge
+  - conda-forge/label/python_rc
 dependencies:
   - bzip2=1.0.8=h99b78c6_7
   - ca-certificates=2025.1.31=hf0a4a13_0
