@@ -2,7 +2,7 @@ name: test_notebook
 
 on:
   push:
-    branches: [main]
+    branches: [main, prepare-challenge-part1]
   pull_request:
     branches: [main]
 
