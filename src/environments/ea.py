@@ -92,7 +92,7 @@ class TransverseTuning(gym.Env):
     def __init__(
         self,
         backend: Literal["cheetah", "doocs", "doocs_dummy"],
-        render_mode: Optional[Literal["human", "rgb_array"]] = None,
+        render_mode: Optional[Literal["human", "rgb_array"]] = "human",
         action_mode: Literal["direct", "delta"] = "direct",
         magnet_init_mode: Optional[Union[Literal["random"], np.ndarray, list]] = None,
         max_quad_setting: float = 72.0,
