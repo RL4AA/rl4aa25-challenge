@@ -29,4 +29,4 @@ jobs:
           environment-file: environment.yml
       - name: Test the notebook by running it
         run: |
-          jupyter execute tutorial.ipynb
+          jupyter execute notebooks/tutorial_part1.ipynb
