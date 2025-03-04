@@ -15,6 +15,19 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 plt.style.use(["science", "nature", "no-latex"])
 
+def evaluate_mae(observations) -> tuple[plt.Figure, plt.Axes]:
+    maes = np.array([np.mean(np.abs(obs["beam"] - obs["target"])) for obs in observations])
+
+    fig, ax = plt.subplots()
+    ax.semilogy(maes * 1000)
+    ax.set_ylabel("Mean Absolute Error (mm)")
+    ax.set_xlabel("Step")
+
+    print(f"Minimum MAE:                {min(maes) * 1000:.3f}  mm")
+    print(f"Sum of MAE over all steps:  {np.sum(maes) * 1000:.3f} mm")
+
+    return fig, ax
+
 
 def load_config(path: str) -> dict:
     """
