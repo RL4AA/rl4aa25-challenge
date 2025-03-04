@@ -28,7 +28,7 @@ jobs:
                 mkdir temp
                 cp -r img/ temp/img/
                 jupyter nbconvert notebooks/tutorial_part1.ipynb --to slides
-                mv tutorial_part1.slides.html temp/index.html
+                mv notebooks/tutorial_part1.slides.html temp/index.html
                 ls -R temp
 
             - name: Deploy
