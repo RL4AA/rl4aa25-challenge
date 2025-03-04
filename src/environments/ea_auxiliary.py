@@ -6,6 +6,7 @@ from ..type_aliases import CombinerLiteral, TransformLiteral
 from ..wrappers import RecordEpisode, RescaleObservation
 from . import ea
 
+
 def make_eval_env(config: dict, ea):
     wrapper_config = config["env_wrapper"]
     env = ea.TransverseTuning(**config["env"])
@@ -18,6 +19,7 @@ def make_eval_env(config: dict, ea):
         env = RescaleAction(env, -1, 1)
     env = FlattenObservation(env)
     return env
+
 
 class TransverseTuning(ea.TransverseTuning):
     """

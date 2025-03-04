@@ -15,8 +15,11 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 plt.style.use(["science", "nature", "no-latex"])
 
+
 def evaluate_mae(observations) -> tuple[plt.Figure, plt.Axes]:
-    maes = np.array([np.mean(np.abs(obs["beam"] - obs["target"])) for obs in observations])
+    maes = np.array(
+        [np.mean(np.abs(obs["beam"] - obs["target"])) for obs in observations]
+    )
 
     fig, ax = plt.subplots()
     ax.semilogy(maes * 1000)
