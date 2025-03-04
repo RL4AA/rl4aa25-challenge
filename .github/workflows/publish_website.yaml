@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - prepare-challenge-part1
 
 jobs:
     push_to_branch:
@@ -29,7 +30,6 @@ jobs:
                 jupyter nbconvert notebooks/tutorial_part1.ipynb --to slides
                 mv tutorial_part1.slides.html temp/index.html
                 ls -R temp
-                rm -r meta-rl/
 
             - name: Deploy
               uses: s0/git-publish-subdir-action@develop
