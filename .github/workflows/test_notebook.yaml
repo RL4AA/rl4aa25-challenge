@@ -2,7 +2,7 @@ name: test_notebook
 
 on:
   push:
-    branches: [prepare-challenge-part1]
+    branches: [master, prepare-challenge-part1]
 
 jobs:
   build:
