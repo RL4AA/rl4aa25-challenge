@@ -1,7 +1,7 @@
 <!-- [![DOI](https://zenodo.org/badge/700362904.svg)](https://zenodo.org/doi/10.5281/zenodo.10886639)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) -->
 
-# Tutorial on Meta-Reinforcement Learning and GP-MPC at the RL4AA'24 Workshop
+# Tutorial on GP-MPC at the RL4AA'25 Workshop
 
 This repository contains the material for tutorial and challenge of the [RL4AA'25](https://indico.scc.kit.edu/event/4216/overview) event.
 
