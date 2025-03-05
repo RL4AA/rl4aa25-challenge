@@ -1,23 +1,64 @@
-# RL4AA'25 Workshop Tutorial
+<!-- [![DOI](https://zenodo.org/badge/700362904.svg)](https://zenodo.org/doi/10.5281/zenodo.10886639)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) -->
 
-Tutorial for the RL4AA'25 Workshop. Indico link to the event: [https://indico.scc.kit.edu/event/4216/]
+# Tutorial on Meta-Reinforcement Learning and GP-MPC at the RL4AA'24 Workshop
 
-## Getting Started
+This repository contains the material for tutorial and challenge of the [RL4AA'25](https://indico.scc.kit.edu/event/4216/overview) event.
 
-### Install dependencies
+Homepage for RL4AA Collaboration: [https://rl4aa.github.io/](https://rl4aa.github.io/)
 
-In virtual environment, run `pip install -r requirements.txt`
+## Theory slides
+- [Introduction to GP-MPC](https://indico.scc.kit.edu/event/4216/sessions/4250/#20250402), Simon Hirländer
 
-To-do (this can happen at the last stage before workshop): create a conda `environment.yml` file for better reproducibility, copy the instruction for last years here.
+## Tutorial and challenge: optimisers vs GP-MPC at ARES
 
-### Run GP-MPC on ARES-EA
+- GitHub repository containing the material: [https://github.com/RL4AA/rl4aa25-tutorial](https://github.com/RL4AA/rl4aa25-tutorial)
+- Tutorial in slide form: [here](https://rl4aa.github.io/rl4aa25-tutorial/)
 
-Simply run `python -m src.run_gpmpc --config=config/config_ea.yaml`
+## Getting started
 
-You can run experiments with different settings by creating a new config file.
+- First, download the material to your computer by cloning the repository:
+`git clone https://github.com/RL4AA/rl4aa25-tutorial.git`
+- If you don't have git installed, you can click on the green button that says "Code", and choose to download it as a `.zip` file.
+- You will find the jupyter notebooks in the `notebooks` folder.
 
-- `env` section handles how the ARES-EA is created and wrapped
-- the other sections defines the behavior of the GP-MPC controller
+## Setting-up your virtual environment
+### Using Conda
+
+- If you don't have conda installed already, you can install the `miniconda` as [described here](https://docs.conda.io/projects/miniconda/en/latest/miniconda-install.html).
+- We recommend to install `miniconda` the day beforehand to avoid network overload during the tutorial &#x2757; &#x2757;
+
+Once `miniconda` is installed run this command in your terminal:
+
+```bash
+conda env create -f environment.yml
+```
+
+This should create a virtual environment named `rl25-tutorial` and install the necessary packages inside.
+
+Afterwards, activate the environment using
+
+```bash
+conda activate rl25-tutorial
+```
+
+### Using venv
+
+If you don't have conda installed, you can create the virtual env with:
+
+```bash
+python3 -m venv rl-tutorial
+```
+
+and activate the env with `$ source <venv>/bin/activate` (bash) or `C:> <venv>/Scripts/activate.bat` (Windows)
+
+Then, install the packages with `pip` within the activated environment
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Afterwards, you should be able to run the provided scripts.
 
 ## Folder Structure
 
@@ -35,11 +76,38 @@ You can run experiments with different settings by creating a new config file.
 - `data/trail.yaml` contains the pre-selected task configurations for evaluation
 - `config/` config files for running GP-MPC control
 
-## AWAKE-compatible GP-MPC
+## Part 1 Optimisers
 
-Now the code is undergoing some refactoring for it to work with ARES-EA Cheetah environment. For reference, you can go back to the previous commit to run it with AWAKE. [fb5139e](https://github.com/RL4AA/rl4aa25-tutorial/commit/fb5139e57022ae23d89d113a8c05b2a24ea9465c)
+## Part 2 GP-MPC
+Simply run `python -m src.run_gpmpc --config=config/config_ea.yaml`
 
-## Development Note
+You can run experiments with different settings by creating a new config file.
+
+- `env` section handles how the ARES-EA is created and wrapped
+- the other sections defines the behavior of the GP-MPC controller
+
+
+## Citing the tutorial
+<!-- 
+This tutorial is uploaded to [Zenodo](https://zenodo.org/doi/10.5281/zenodo.10886639).
+Please use the following DOI when citing this code:
+
+```bibtex
+@software{hirlaender_2024_10887397,
+    title        = {{Tutorial on Meta-Reinforcement Learning and GP-MPC at the RL4AA'24 Workshop}},
+    author       = {Hirlaender, Simon and Kaiser, Jan and Xu, Chenran and Santamaria Garcia, Andrea},
+    year         = 2024,
+    month        = mar,
+    publisher    = {Zenodo},
+    doi          = {10.5281/zenodo.10887397},
+    url          = {https://doi.org/10.5281/zenodo.10887397},
+    version      = {v1.0.2}
+} -->
+
+
+
+
+## To be removed before publishing: NOTES FOR DEVS
 
 ### Code Formatting
 
@@ -130,3 +198,4 @@ For more examples and details on the ARES RL environment, c.f.
 - Code repository: <https://github.com/desy-ml/rl-vs-bo>
 
 Now we add new tests
+
