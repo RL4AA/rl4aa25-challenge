@@ -3,7 +3,7 @@ name: publish_website
 on:
   push:
     branches:
-      - main
+      - master
       - prepare-challenge-part1
 
 jobs:
