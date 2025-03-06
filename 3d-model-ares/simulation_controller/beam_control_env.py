@@ -5,6 +5,7 @@ import random
 from collections import OrderedDict
 from typing import Any, Dict, Optional, Tuple
 
+import ARESlatticeStage3v1_9 as ares_lattice
 import cheetah
 import gymnasium as gym
 import numpy as np
@@ -12,8 +13,6 @@ import torch
 from cheetah import Segment
 from cheetah.utils.segment_3d_builder import Segment3DBuilder
 from gymnasium import spaces
-
-import ARESlatticeStage3v1_9 as ares_lattice
 from rewarder import Rewarder
 
 # Set logging level based on environment

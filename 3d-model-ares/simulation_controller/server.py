@@ -6,9 +6,8 @@ import time
 
 import numpy as np
 import yaml
-from stable_baselines3.common.utils import set_random_seed
-
 from beam_control_env import BeamControlEnv
+from stable_baselines3.common.utils import set_random_seed
 from websocket_wrapper import WebSocketWrapper
 
 # Configure logging

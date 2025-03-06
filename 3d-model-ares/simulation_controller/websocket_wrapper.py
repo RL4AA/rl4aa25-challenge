@@ -1,5 +1,4 @@
 import argparse
-import yaml
 import asyncio
 import json
 import logging
@@ -9,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 import gymnasium as gym
 import numpy as np
 import websockets
-
+import yaml
 from beam_control_env import BeamControlEnv
 
 # Configure logging
