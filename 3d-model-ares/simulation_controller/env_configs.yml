@@ -1,0 +1,33 @@
+env_config:
+  num_envs: 40                        # For multiple environments, the agent will train for a total of max_episodes * n_envs episodes
+  max_episode_steps: 150              # The maximum number of steps allowed before truncating an episode
+  total_timesteps: 5000000            # The total number of samples (env steps) to train on
+  render_mode: "human"                # Render environment visualization
+  progress_bar: False                 # Display a progress bar with the current progress, elapsed time and estimated remaining time
+  lattice_config: simulation_controller/lattice_config.json # Path to lattice segment configuration
+  host: "localhost"                   # Hostname for the server connection
+  port: 8081                          # Port number for the server to listen on
+
+PPO:
+  policy: "MlpPolicy"                 # Type of policy (e.g., MlpPolicy)
+  n_steps: 128                        # Number of steps to collect in each environment per update
+  batch_size: 128                     # Batch size, e.g. 128/256
+  n_epochs: 10                        # Number of times each batch is used to update the model
+  gamma: 0.99                         # Discount factor for future rewards
+  gae_lambda: 0.95                    # Trade-off for bias vs variance in Generalized Advantage Estimator
+  normalize_advantage: true           # Normalize the advantage
+  learning_rate: 0.0003               # Step size for the optimizer, e.g. 0.00002
+  policy_kwargs:
+    net_arch: [64, 64]                # MLP architecture, e.g. [64, 64] / [256, 256]
+    activation_fn: torch.nn.ReLU      # Hidden activation function, e.g. Sigmoid
+  ent_coef: 0.01                      # Entropy coefficient (e.g. 0.1)
+  vf_coef: 0.5                        # Value function coefficient
+  clip_range: 0.2                     # Clipping parameter
+  tensorboard_log: "./benchmark_studies/experiments/ppo_tensorboard_exp-1"   # TensorBoard log directory
+  device: "cpu"                       # Device setting
+  verbose: 1                          # Verbosity level
+  seed: null                          # Seed for the pseudo random generators
+
+reward_signals:
+  l2_norm_alignment_distance:         # Beam target alignment
+    weight: 1.0
