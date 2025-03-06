@@ -73,7 +73,7 @@ async def run_simulation(env: WebSocketWrapper):
             step_count,
             last_action,
             reward,
-            observation
+            observation,
         )
 
         done = terminated or truncated
