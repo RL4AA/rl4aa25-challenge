@@ -18,7 +18,9 @@ conda activate rlaa2025
 
 ### 2. Install Python Dependencies
 ```bash
-pip install -r requirements.txt
+pip install -r simulation_controller/requirements.txt
+python -m pip install git+https://github.com/ocelot-collab/ocelot.git@v22.12.0
+pip install git+https://github.com/chrisjcc/cheetah.git@feature/3d_lattice_viewer
 ```
 
 ### 3. Set Up JavaScript Dependencies
