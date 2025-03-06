@@ -1,16 +1,14 @@
 import asyncio
-import json
 import logging
 import os
 import random
 from collections import OrderedDict
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import cheetah
 import gymnasium as gym
 import numpy as np
 import torch
-
 from cheetah import Segment
 from cheetah.utils.segment_3d_builder import Segment3DBuilder
 from gymnasium import spaces
@@ -81,9 +79,9 @@ class BeamControlEnv(gym.Env):
 
         # Setup the main beamline lattice segment
         self.lattice_segment = cheetah.Segment.from_ocelot(
-           ares_lattice.cell, warnings=False, device="cpu"
+            ares_lattice.cell, warnings=False, device="cpu"
         ).subcell(
-           "AREASOLA1", "AREABSCR1"
+            "AREASOLA1", "AREABSCR1"
         )  # Add the section of focus
 
         self.lattice_segment.AREABSCR1.is_active = True  # Activate screen
@@ -93,12 +91,13 @@ class BeamControlEnv(gym.Env):
 
         # Build and export the 3D scene
         self.builder.build_segment(
-            output_filename="public/models/ares/scene.glb",
-            is_export_enabled=False
+            output_filename="public/models/ares/scene.glb", is_export_enabled=False
         )
 
         # Track lattice component positions
-        self.component_positions = torch.tensor(list(self.builder.component_positions.values()), dtype=torch.float32)
+        self.component_positions = torch.tensor(
+            list(self.builder.component_positions.values()), dtype=torch.float32
+        )
 
         # Define and generate lattice segments
         self.segments = OrderedDict()
@@ -114,9 +113,8 @@ class BeamControlEnv(gym.Env):
 
         for segment_name, segment_info in segment_definitions.items():
             self.segments[segment_name] = self.lattice_segment.subcell(
-                segment_info["start"], 
-                segment_info["end"]
-        )
+                segment_info["start"], segment_info["end"]
+            )
 
         # Define screen
         self.screen_name = "AREABSCR1"
@@ -165,7 +163,8 @@ class BeamControlEnv(gym.Env):
         )
 
         # Action space
-        # Quadrupoles have a range from -72 to 72 1/(m^2). (in operation we would not go above 30)
+        # Quadrupoles have a range from -72 to 72 1/(m^2).
+        # Note: in operation we would not go above 30
         # Steerers can range from -6.1782e-3 rad to 6.1782e-3 rad.
         self.action_space = spaces.Box(
             low=np.array([-72, -72, -6.1782e-3, -72, -6.1782e-3], dtype=np.float32),
@@ -186,22 +185,18 @@ class BeamControlEnv(gym.Env):
 
         self.current_step = 0  # Episode step counter
         self.beam_has_been_on_screen = False
-        self.info = {
-            "component_positions": self.component_positions.tolist()
-        }
+        self.info = {"component_positions": self.component_positions.tolist()}
 
         # Sample an ellipsoid beam distribution with attributes
         # (x, px, y, py, tau, sigma, 1) with N particles
-        self.num_particles = 1_000 # Default: 100, 1_000, or 10_000
+        self.num_particles = 1_000  # Default: 100, 1_000, or 10_000
         self.incoming_particle_beam = None
 
         # Define visual scaling factors (s_x, s_y), estimated manually
         self.scale_x = 10  # 45  # simulated_width / physical_width
         self.scale_y = 10  # 30  # simulated_height / physical_height
-        self.position_scale_factor = torch.tensor([
-            self.scale_x, self.scale_y, 1
-            ],
-            dtype=torch.float32
+        self.position_scale_factor = torch.tensor(
+            [self.scale_x, self.scale_y, 1], dtype=torch.float32
         )  # z-direction does not get scaled
         self.beam_width_scale_factor = 1  # Scale beam width (default: 25, alt: 100000)
 
@@ -219,9 +214,9 @@ class BeamControlEnv(gym.Env):
             Tuple[np.ndarray, Dict[str, Any]]: Initial observation and info dictionary.
         """
         # Reset episode state and termination flags
-        self.current_step = 0    # Reset timestep counter
+        self.current_step = 0  # Reset timestep counter
         self.terminated = False  # Natural episode end (e.g., task completion/failure)
-        self.truncated = False   # Forced episode end (e.g., max steps reached)
+        self.truncated = False  # Forced episode end (e.g., max steps reached)
 
         # Reset episode state
         self.current_step = 0  # Reset timestep counter
@@ -243,7 +238,7 @@ class BeamControlEnv(gym.Env):
         self.target_beam_initial_parameters = self.beam_parameter_space.sample()
 
         # Create incoming beam using the initial parameters
-        #self.incoming_beam = cheetah.ParticleBeam.from_parameters(
+        # self.incoming_beam = cheetah.ParticleBeam.from_parameters(
         #    energy=torch.tensor(self.beam_initial_parameters[0], dtype=torch.float32),
         #    mu_x=torch.tensor(self.beam_initial_parameters[1], dtype=torch.float32),
         #    mu_px=torch.tensor(self.beam_initial_parameters[2], dtype=torch.float32),
@@ -257,32 +252,35 @@ class BeamControlEnv(gym.Env):
         #        self.beam_initial_parameters[9], dtype=torch.float32
         #    ),
         #    sigma_p=torch.tensor(self.beam_initial_parameters[10], dtype=torch.float32),
-        #)
+        # )
 
         self.incoming_beam = cheetah.ParticleBeam.from_astra(
-            os.path.join(os.getcwd(),
-            "simulation_controller",
-            "resources/ACHIP_EA1_2021.1351.001"
+            os.path.join(
+                os.getcwd(),
+                "simulation_controller",
+                "resources/ACHIP_EA1_2021.1351.001",
             ),
             device="cpu",
         )
 
         # Create uniform particle beam (based-on random initial beam parameters)
-        #self.incoming_particle_beam = cheetah.ParticleBeam.uniform_3d_ellipsoid(
+        # self.incoming_particle_beam = cheetah.ParticleBeam.uniform_3d_ellipsoid(
         #    num_particles=self.num_particles,
         #    radius_x=torch.tensor(0.001, dtype=torch.float32),    # Default: 0.01
         #    radius_y=torch.tensor(0.001, dtype=torch.float32),    # Default: 0.01
-        #    radius_tau=torch.tensor(0.002, dtype=torch.float32),  # Default: 0.02 (radius of the beam in s-direction in the lab frame)
+        # radius of the beam in s-direction in the lab frame
+        #    radius_tau=torch.tensor(0.002, dtype=torch.float32),  # Default: 0.02
         #    sigma_px=torch.tensor(self.beam_initial_parameters[6], dtype=torch.float32),
         #    sigma_py=torch.tensor(self.beam_initial_parameters[8], dtype=torch.float32),
         #    sigma_p=torch.tensor(self.beam_initial_parameters[10], dtype=torch.float32),
         #    energy=torch.tensor(self.beam_initial_parameters[0], dtype=torch.float32),
         #    dtype=torch.float32,
         #    device="cpu",
-        #)
+        # )
 
-        # TODO: Newly introduced to merge the pre-defined beam and the particle distribution beam
-        #self.incoming_particle_beam.transformed_to(
+        # TODO: Newly introduced to merge the pre-defined beam
+        # and the particle distribution beam
+        # self.incoming_particle_beam.transformed_to(
         #    energy=self.incoming_beam.clone().float(),
         #    mu_x=self.incoming_beam.mu_x.clone().float(),
         #    mu_px=self.incoming_beam.mu_px.clone().float(),
@@ -293,17 +291,19 @@ class BeamControlEnv(gym.Env):
         #    sigma_y=self.incoming_beam.sigma_y.clone().float(),
         #    sigma_py=self.incoming_beam.sigma_py.clone().float(),
         #    sigma_p=self.incoming_beam.sigma_p.clone().float(),
-        #)
+        # )
 
         self.incoming_particle_beam = cheetah.ParticleBeam.uniform_3d_ellipsoid(
             num_particles=self.num_particles,
-            radius_x=torch.tensor(0.001, dtype=torch.float32),    # Default: 0.01
-            radius_y=torch.tensor(0.001, dtype=torch.float32),    # Default: 0.01
-            radius_tau=torch.tensor(0.002, dtype=torch.float32),  # Default: 0.02 (radius of the beam in s-direction in the lab frame)
-            sigma_px=self.incoming_beam.sigma_px.clone().to('cpu').float(),
-            sigma_py=self.incoming_beam.sigma_py.clone().to('cpu').float(),
-            sigma_p=self.incoming_beam.sigma_p.clone().to('cpu').float(),
-            energy=self.incoming_beam.energy.clone().to('cpu').float(),
+            radius_x=torch.tensor(0.001, dtype=torch.float32),  # Default: 0.01
+            radius_y=torch.tensor(0.001, dtype=torch.float32),  # Default: 0.01
+            radius_tau=torch.tensor(
+                0.002, dtype=torch.float32
+            ),  # Default: 0.02 (radius of the beam in s-direction in the lab frame)
+            sigma_px=self.incoming_beam.sigma_px.clone().to("cpu").float(),
+            sigma_py=self.incoming_beam.sigma_py.clone().to("cpu").float(),
+            sigma_p=self.incoming_beam.sigma_p.clone().to("cpu").float(),
+            energy=self.incoming_beam.energy.clone().to("cpu").float(),
             dtype=torch.float32,
             device="cpu",
         )
@@ -363,19 +363,21 @@ class BeamControlEnv(gym.Env):
         )
 
         # Update info dictionary with environment state
-        self.info.update({
-            "screen_boundary_x": float(self.screen_boundary[0]),
-            "screen_boundary_y": float(self.screen_boundary[1]),
-            "beam_has_been_on_screen": self.beam_has_been_on_screen,
-            "reward": float(self.reward),
-            "terminated": self.terminated,
-            "truncated": self.truncated,
-            "mu_x": observation[0].item(),
-            "mu_y": observation[1].item(),
-            "sigma_x": observation[2].item(),
-            "sigma_y": observation[3].item(),
-            "bunch_count": self.current_step + 1,
-        })
+        self.info.update(
+            {
+                "screen_boundary_x": float(self.screen_boundary[0]),
+                "screen_boundary_y": float(self.screen_boundary[1]),
+                "beam_has_been_on_screen": self.beam_has_been_on_screen,
+                "reward": float(self.reward),
+                "terminated": self.terminated,
+                "truncated": self.truncated,
+                "mu_x": observation[0].item(),
+                "mu_y": observation[1].item(),
+                "sigma_x": observation[2].item(),
+                "sigma_y": observation[3].item(),
+                "bunch_count": self.current_step + 1,
+            }
+        )
 
         return observation, self.info
 
@@ -415,20 +417,22 @@ class BeamControlEnv(gym.Env):
         self._is_terminal()
 
         # Update info dictionary with environment state
-        self.info.update({
-            "reward": self.reward,
-            "terminated": self.terminated,
-            "truncated": self.truncated,
-            "beam_has_been_on_screen": self.beam_has_been_on_screen,
-            "distance_to_target": float(
-                np.linalg.norm(observation - self.target_beam_observation)
-            ),
-            "mu_x": observation[0].item(),
-            "mu_y": observation[1].item(),
-            "sigma_x": observation[2].item(),
-            "sigma_y": observation[3].item(),
-            "bunch_count": self.current_step + 1,
-        })
+        self.info.update(
+            {
+                "reward": self.reward,
+                "terminated": self.terminated,
+                "truncated": self.truncated,
+                "beam_has_been_on_screen": self.beam_has_been_on_screen,
+                "distance_to_target": float(
+                    np.linalg.norm(observation - self.target_beam_observation)
+                ),
+                "mu_x": observation[0].item(),
+                "mu_y": observation[1].item(),
+                "sigma_x": observation[2].item(),
+                "sigma_y": observation[3].item(),
+                "bunch_count": self.current_step + 1,
+            }
+        )
 
         return observation, self.reward, self.terminated, self.truncated, self.info
 
@@ -454,9 +458,7 @@ class BeamControlEnv(gym.Env):
         """
         # Get current beam position
         read_beam = self.screen.get_read_beam()
-        beam_position = np.array(
-            [read_beam.mu_x.item(), read_beam.mu_y.item()]
-        )
+        beam_position = np.array([read_beam.mu_x.item(), read_beam.mu_y.item()])
 
         # Check if the beam position is within the screen boundaries
         self.screen_boundary = self.get_screen_boundary()
@@ -476,8 +478,11 @@ class BeamControlEnv(gym.Env):
         if self.render_mode == "human" and self.websocket_manager:
             # Broadcast (i.e. sending) beam data to all connected WebSocket clients
             await self.websocket_manager.broadcast(self.info)
-            # Add delay after broadcasting to allow animation to complete before sending new
-            await asyncio.sleep(10.0)  # Adjust delay as needed (e.g., 250ms = 0.25s or 20.0s or 0.226s)
+            # Add delay after broadcasting to allow animation to complete
+            # before sending new
+            await asyncio.sleep(
+                10.0
+            )  # Adjust delay as needed (e.g., 250ms = 0.25s or 20.0s or 0.226s)
 
     def _set_global_seed(self, seed: int) -> None:
         """
@@ -653,15 +658,18 @@ class BeamControlEnv(gym.Env):
 
         lattice_sub_segment = self.segments["AREAMQZM1"]
 
-        #incoming_beam = self.incoming_beam
+        # incoming_beam = self.incoming_beam
         incoming_beam = self.incoming_particle_beam
 
         # Stack the x, y, and modified z positions for each particle
-        positions = torch.stack([
-            incoming_beam.x,
-            incoming_beam.y,
-            incoming_beam.tau + self.component_positions[0]
-        ], dim=-1)  # dim=-1 stacks along the last dimension
+        positions = torch.stack(
+            [
+                incoming_beam.x,
+                incoming_beam.y,
+                incoming_beam.tau + self.component_positions[0],
+            ],
+            dim=-1,
+        )  # dim=-1 stacks along the last dimension
 
         data["segment_0"] = {
             "segment_name": "AREASOLA1",
@@ -669,12 +677,15 @@ class BeamControlEnv(gym.Env):
         }
 
         # Loop through the lattice sub-segments
-        for i, (segment_name, lattice_sub_segment) in enumerate(self.segments.items(), 1):
+        for i, (segment_name, lattice_sub_segment) in enumerate(
+            self.segments.items(), 1
+        ):
             # Track the incoming beam with updated magnet settings through this segment,
             # returns ParticleBeam (particles size [32, 7])
             outgoing_beam = lattice_sub_segment.track(incoming_beam)
 
-            # Track by recalculate particle beam with updated observation (TODO: still need for a epsilloid distribution??)
+            # Track by recalculate particle beam with updated observation
+            # (TODO: still need for a epsilloid distribution??)
             self.incoming_particle_beam = self.incoming_particle_beam.transformed_to(
                 energy=outgoing_beam.energy.clone().detach().float(),
                 mu_x=outgoing_beam.mu_x.clone().detach().float(),
@@ -689,21 +700,38 @@ class BeamControlEnv(gym.Env):
             )
 
             # Beam width in the xy-direction
-            beam_width = torch.tensor([
-                    1.0 if self.beam_width_scale_factor == 1.0 else self.beam_width_scale_factor * outgoing_beam.sigma_x.clone().detach().float(),
-                    1.0 if self.beam_width_scale_factor == 1.0 else self.beam_width_scale_factor * outgoing_beam.sigma_y.clone().detach().float(),
-                    1.0 if self.beam_width_scale_factor == 1.0 else self.beam_width_scale_factor * outgoing_beam.sigma_tau.clone().detach().float(),
+            beam_width = torch.tensor(
+                [
+                    (
+                        1.0
+                        if self.beam_width_scale_factor == 1.0
+                        else self.beam_width_scale_factor
+                        * outgoing_beam.sigma_x.clone().detach().float()
+                    ),
+                    (
+                        1.0
+                        if self.beam_width_scale_factor == 1.0
+                        else self.beam_width_scale_factor
+                        * outgoing_beam.sigma_y.clone().detach().float()
+                    ),
+                    (
+                        1.0
+                        if self.beam_width_scale_factor == 1.0
+                        else self.beam_width_scale_factor
+                        * outgoing_beam.sigma_tau.clone().detach().float()
+                    ),
                 ],
-                dtype=torch.float32
+                dtype=torch.float32,
             )
 
             # Use the beam's center as the original center of geometry
-            beam_center = torch.tensor([
+            beam_center = torch.tensor(
+                [
                     self.incoming_particle_beam.mu_x,
                     self.incoming_particle_beam.mu_y,
-                    self.incoming_particle_beam.mu_tau
+                    self.incoming_particle_beam.mu_tau,
                 ],
-                dtype=torch.float32
+                dtype=torch.float32,
             )
 
             # Pair x and y values from columns 0 and 2 into (x, y) tuples.
@@ -711,17 +739,21 @@ class BeamControlEnv(gym.Env):
             y = self.incoming_particle_beam.particles[:, 2]  # Column 2
             z = self.incoming_particle_beam.particles[:, 4]  # Column 4
 
-            beam_vertices = torch.stack([x, y, z + self.builder.component_positions[segment_name]], dim=1)
+            beam_vertices = torch.stack(
+                [x, y, z + self.builder.component_positions[segment_name]], dim=1
+            )
             beam_vertices *= beam_width
 
             # Apply differential scaling transformation around the beam center,
-            # the transformation is linear and directionally anisotropic 
+            # the transformation is linear and directionally anisotropic
             # (only affects x and y while keeping z unchanged).
-            if segment_name == self.screen_name: # OR "AREAMCHM1" ??
-                epsilon = 1e-6  # Small value to prevent near-zero effects,
-                I = torch.ones_like(self.position_scale_factor)
-                # We ensure that even when beam_center is close to zero, the transformation still applies
-                positions = beam_vertices + (self.position_scale_factor - I) * beam_center
+            if segment_name == self.screen_name:  # OR "AREAMCHM1" ??
+                identity = torch.ones_like(self.position_scale_factor)
+                # We ensure that even when beam_center is close to zero,
+                # the transformation still applies
+                positions = (
+                    beam_vertices + (self.position_scale_factor - identity) * beam_center
+                )
             else:
                 positions = beam_vertices
 
@@ -734,20 +766,25 @@ class BeamControlEnv(gym.Env):
             # Update the incoming beam for next lattice segement
             incoming_beam = outgoing_beam
 
-        # Track the initial lattice segment to retrieve the beam position from the diagnostic screen later
+        # Track the initial lattice segment to retrieve the beam position
+        # from the diagnostic screen later
         self._update()
 
         self.screen_reading = self.lattice_segment.AREABSCR1.reading
 
         # Update meta info to include particle reading from segments
-        self.info.update({
-            "segments": data,
-            # Sum of the weighted particles distribution across screen pixels
-            "screen_reading": self.screen_reading.tolist(),
-        })
+        self.info.update(
+            {
+                "segments": data,
+                # Sum of the weighted particles distribution across screen pixels
+                "screen_reading": self.screen_reading.tolist(),
+            }
+        )
 
     def _update(self) -> None:
-    	_ = self.lattice_segment.track(self.incoming_beam) # self.incoming_particle_beam
+        _ = self.lattice_segment.track(
+            self.incoming_beam
+        )  # self.incoming_particle_beam
 
     def get_screen_boundary(self) -> np.ndarray:
         """

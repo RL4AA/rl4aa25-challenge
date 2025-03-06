@@ -1,5 +1,4 @@
 import numpy as np
-import math
 
 
 class Rewarder:
@@ -11,7 +10,9 @@ class Rewarder:
         """
         self.config = config
         self.info = {}
-        self.weights = np.array([1, 1, 2, 2])  # Configurable weights for objective calculation
+        self.weights = np.array(
+            [1, 1, 2, 2]
+        )  # Configurable weights for objective calculation
 
     def l1_norm_variance(self, state, target):
         """
@@ -71,7 +72,7 @@ class Rewarder:
         """
         distance = float(np.linalg.norm(state - target))
 
-        return 1.0 / (1.0 + distance / self.max_distance)**2
+        return 1.0 / (1.0 + distance / self.max_distance) ** 2
 
     def exponential_l2_norm_alignment_distance(self, state, target):
         """
@@ -128,7 +129,6 @@ class Rewarder:
         Calculate the reward based on the change in the objective value.
 
         Sources:
-          - Eq. (5)-(6). https://journals.aps.org/prab/abstract/10.1103/PhysRevAccelBeams.27.054601
           - Eq. (4), https://arxiv.org/pdf/2306.03739
           - No eq. numbers, https://proceedings.mlr.press/v162/kaiser22a/kaiser22a.pdf
         """
@@ -141,7 +141,8 @@ class Rewarder:
         # Reward is the difference between the previous and current objective values
         reward = previous_objective - objective
 
-        # Return the reward, ensuring it's at least double the negative value if it’s less than zero
+        # Return the reward, ensuring it's at least double the negative value
+        # if it’s less than zero
         return reward if reward > 0 else 2 * reward
 
     def _objective_fn(self, state: np.ndarray, target: np.ndarray) -> float:
@@ -168,7 +169,8 @@ class Rewarder:
         total_reward = 0
         reward_components = {}
 
-        # maximum stance from the center of the half width × height rectangle to a corner
+        # maximum stance from the center of the half width × height rectangle
+        # to a corner
         self.max_distance = float(np.linalg.norm([height, width]))
 
         for reward_label, weight in self.config.items():
@@ -177,9 +179,9 @@ class Rewarder:
             elif reward_label == "l2_norm_variance":
                 reward = self.l2_norm_variance(state, target)
             elif reward_label == "l2_norm_alignment_distance":
-                 reward = self.l2_norm_alignment_distance(state, target)
+                reward = self.l2_norm_alignment_distance(state, target)
             elif reward_label == "normalized_alignment_distance":
-                 reward = self.normalized_alignment_distance(state, target)
+                reward = self.normalized_alignment_distance(state, target)
             elif reward_label == "progress_alignment_distance":
                 reward = self.progress_alignment_distance(state, prev_state, target)
             elif reward_label == "inverse_alignment_distance":
@@ -189,7 +191,9 @@ class Rewarder:
             elif reward_label == "exponential_l2_norm_alignment_distance":
                 reward = self.exponential_l2_norm_alignment_distance(state, target)
             elif reward_label == "logarithmic_scaling_inverse_alignment_distance":
-                reward = self.logarithmic_scaling_inverse_alignment_distance(state, target)
+                reward = self.logarithmic_scaling_inverse_alignment_distance(
+                    state, target
+                )
             elif reward_label == "logarithmic_scaling_alignment_distance":
                 reward = self.logarithmic_scaling_alignment_distance(state, target)
             elif reward_label == "objective_progress":
@@ -202,10 +206,12 @@ class Rewarder:
             total_reward += weight * reward
 
         # Update info dictionary with reward details
-        self.info.update({
-            "reward_components": reward_components,
-            "reward_weights": list(self.config.values()),
-        })
+        self.info.update(
+            {
+                "reward_components": reward_components,
+                "reward_weights": list(self.config.values()),
+            }
+        )
 
         return float(total_reward)
 

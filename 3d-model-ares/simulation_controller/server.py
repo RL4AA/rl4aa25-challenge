@@ -3,6 +3,7 @@ import asyncio
 import collections
 import logging
 import time
+
 import numpy as np
 import yaml
 from stable_baselines3.common.utils import set_random_seed
@@ -15,6 +16,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
+
 
 async def run_simulation(env: WebSocketWrapper):
     """Run the simulation loop, stepping the environment with control actions."""
@@ -56,7 +58,9 @@ async def run_simulation(env: WebSocketWrapper):
             last_action = action_queue.popleft()  # Take the oldest action
         elif time.time() - last_action_time > 2:
             # If no new actions for too long, issue a warning
-            logger.warning("No new control action received for 2 seconds. Using last action.")
+            logger.warning(
+                "No new control action received for 2 seconds. Using last action."
+            )
 
         # Step through the environment with the action
         observation, reward, terminated, truncated, info = env.step(last_action)
@@ -65,12 +69,15 @@ async def run_simulation(env: WebSocketWrapper):
         step_count += 1
 
         logger.info(
-            f"Step {step_count}: Action = {last_action}, Reward = {reward}, Observation = {observation}"
+            "Step %d: Action = %s, Reward = %s, Observation = %s",
+            step_count, last_action, reward, observation
         )
+
         done = terminated or truncated
 
     env.close()
     logger.info("Simulation completed.")
+
 
 async def main():
     """Main entry point to set up the environment and start the simulation."""
@@ -91,9 +98,6 @@ async def main():
     if config["env_config"].get("seed") is not None:
         set_random_seed(config["env_config"]["seed"])
 
-    host = config["env_config"].get("host", "localhost")
-    port = config["env_config"].get("port", 8081)
-
     # Initialize the environment and wrap it with WebSocketWrapper
     env = BeamControlEnv(config=config)
     env = WebSocketWrapper(env)
@@ -102,6 +106,7 @@ async def main():
     await run_simulation(env)
 
     logger.info("Simulation shutdown completed.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
