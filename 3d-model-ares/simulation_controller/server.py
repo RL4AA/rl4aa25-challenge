@@ -70,7 +70,10 @@ async def run_simulation(env: WebSocketWrapper):
 
         logger.info(
             "Step %d: Action = %s, Reward = %s, Observation = %s",
-            step_count, last_action, reward, observation
+            step_count,
+            last_action,
+            reward,
+            observation
         )
 
         done = terminated or truncated
