@@ -37,7 +37,7 @@ npm install -g concurrently@8.2.2
 ### 4. Run the Application
 Start the development server:
 ```bash
-npm run dev
+npm run start
 ```
 
 ## Additional Notes
