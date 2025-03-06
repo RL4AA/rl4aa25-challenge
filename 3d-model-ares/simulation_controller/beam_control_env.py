@@ -33,26 +33,35 @@ class BeamControlEnv(gym.Env):
 
     Attributes:
         - ocelot_lattice (ARESLattice): Lattice structure for the accelerator.
-        - lattice_segment (cheetah.Segment): Main segment of the beamline lattice.
-        - beam_parameter_space (spaces.Box): Space defining the beam's initial parameters.
-        - observation_space (spaces.Box): Space defining the range of observations.
+        - lattice_segment (cheetah.Segment): Main segment of the beamline.
+        - beam_parameter_space (spaces.Box): Space defining the beam's
+            initial parameters.
+        - observation_space (spaces.Box): Space defining the range
+            of observations.
         - action_space (spaces.Box): Space defining valid actions.
         - current_step (int): Counter for the current step in the episode.
         - target_distance (float): Target distance for beam alignment.
         - reward (float): Accumulated reward during the episodes
-        - seed (int): This method sets seeds for numpy, random, and torch (for CPU and GPU)
-                      to ensure reproducibility across random operations.
+        - seed (int): This method sets seeds for numpy, random,
+            and torch (for CPU and GPU)
+            to ensure reproducibility across random operations.
 
     Methods:
-        - __init__: Initializes the environment, lattice structure, and WebSocket connection.
-        - reset: Resets the environment to an initial state and returns the initial observation.
-        - step: Takes an action, simulates beam dynamics, and returns the new state,
-           reward, and info.
-        - _simulate: Updates segment properties and tracks the beam through the lattice.
-        - _reward: Calculates and returns the reward based on beam alignment and focusing.
-        - _apply_magnet_settings: Applies new magnet settings based on action input.
+        - __init__: Initializes the environment, lattice structure,
+            and WebSocket connection.
+        - reset: Resets the environment to an initial state and returns
+            the initial observation.
+        - step: Takes an action, simulates beam dynamics, and returns
+            the new state, reward, and info.
+        - _simulate: Updates segment properties and tracks the beam
+            through the lattice.
+        - _reward: Calculates and returns the reward based on beam alignment
+            and focusing.
+        - _apply_magnet_settings: Applies new magnet settings
+            based on action input.
         - _get_obs: Generates observations from the beam state.
-        - _is_terminal: Checks if the current episode has reached a terminal state.
+        - _is_terminal: Checks if the current episode has reached
+            a terminal state.
         - _is_beam_on_screen: Checks whether the beam position
            is within the visible screen boundaries.
     """
@@ -62,7 +71,8 @@ class BeamControlEnv(gym.Env):
         Initialize BeamControlEnv.
 
         Args:
-            config (dict): Configuration parameters for environment, training, and reward.
+            config (dict): Configuration parameters for environment, training,
+            and reward.
         """
         super(BeamControlEnv, self).__init__()
 
@@ -75,7 +85,7 @@ class BeamControlEnv(gym.Env):
         self.port = self.config["env_config"].get("port", 8081)
 
         # WebSocket Manager
-        self.websocket_manager = websocket_manager  # External WebSocket handler
+        self.websocket_manager = websocket_manager
 
         # Setup the main beamline lattice segment
         self.lattice_segment = cheetah.Segment.from_ocelot(
@@ -175,9 +185,9 @@ class BeamControlEnv(gym.Env):
 
         # Control and Reward Initialization
         self.control_action = None
-        self.reward_signals = (
-            {}
-        )  # Breakdown of reward components (e.g., {'beam_alignment': 0.5, 'beam_focus': 0.3})
+        # Breakdown of reward components (e.g., {'beam_alignment': 0.5})
+        self.reward_signals = {}
+
         for reward_name, reward_config in self.config["reward_signals"].items():
             self.reward_signals[reward_name] = reward_config["weight"]
 
@@ -239,19 +249,29 @@ class BeamControlEnv(gym.Env):
 
         # Create incoming beam using the initial parameters
         # self.incoming_beam = cheetah.ParticleBeam.from_parameters(
-        #    energy=torch.tensor(self.beam_initial_parameters[0], dtype=torch.float32),
-        #    mu_x=torch.tensor(self.beam_initial_parameters[1], dtype=torch.float32),
-        #    mu_px=torch.tensor(self.beam_initial_parameters[2], dtype=torch.float32),
-        #    mu_y=torch.tensor(self.beam_initial_parameters[3], dtype=torch.float32),
-        #    mu_py=torch.tensor(self.beam_initial_parameters[4], dtype=torch.float32),
-        #    sigma_x=torch.tensor(self.beam_initial_parameters[5], dtype=torch.float32),
-        #    sigma_px=torch.tensor(self.beam_initial_parameters[6], dtype=torch.float32),
-        #    sigma_y=torch.tensor(self.beam_initial_parameters[7], dtype=torch.float32),
-        #    sigma_py=torch.tensor(self.beam_initial_parameters[8], dtype=torch.float32),
+        #    energy=torch.tensor(self.beam_initial_parameters[0],
+        #        dtype=torch.float32),
+        #    mu_x=torch.tensor(self.beam_initial_parameters[1],
+        #        dtype=torch.float32),
+        #    mu_px=torch.tensor(self.beam_initial_parameters[2],
+        #        dtype=torch.float32),
+        #    mu_y=torch.tensor(self.beam_initial_parameters[3],
+        #        dtype=torch.float32),
+        #    mu_py=torch.tensor(self.beam_initial_parameters[4],
+        #        dtype=torch.float32),
+        #    sigma_x=torch.tensor(self.beam_initial_parameters[5],
+        #        dtype=torch.float32),
+        #    sigma_px=torch.tensor(self.beam_initial_parameters[6],
+        #        dtype=torch.float32),
+        #    sigma_y=torch.tensor(self.beam_initial_parameters[7],
+        #        dtype=torch.float32),
+        #    sigma_py=torch.tensor(self.beam_initial_parameters[8],
+        #        dtype=torch.float32),
         #    sigma_tau=torch.tensor(
         #        self.beam_initial_parameters[9], dtype=torch.float32
         #    ),
-        #    sigma_p=torch.tensor(self.beam_initial_parameters[10], dtype=torch.float32),
+        #    sigma_p=torch.tensor(self.beam_initial_parameters[10],
+        #        dtype=torch.float32),
         # )
 
         self.incoming_beam = cheetah.ParticleBeam.from_astra(
@@ -270,10 +290,14 @@ class BeamControlEnv(gym.Env):
         #    radius_y=torch.tensor(0.001, dtype=torch.float32),    # Default: 0.01
         # radius of the beam in s-direction in the lab frame
         #    radius_tau=torch.tensor(0.002, dtype=torch.float32),  # Default: 0.02
-        #    sigma_px=torch.tensor(self.beam_initial_parameters[6], dtype=torch.float32),
-        #    sigma_py=torch.tensor(self.beam_initial_parameters[8], dtype=torch.float32),
-        #    sigma_p=torch.tensor(self.beam_initial_parameters[10], dtype=torch.float32),
-        #    energy=torch.tensor(self.beam_initial_parameters[0], dtype=torch.float32),
+        #    sigma_px=torch.tensor(self.beam_initial_parameters[6],
+        #        dtype=torch.float32),
+        #    sigma_py=torch.tensor(self.beam_initial_parameters[8],
+        #        dtype=torch.float32),
+        #    sigma_p=torch.tensor(self.beam_initial_parameters[10],
+        #        dtype=torch.float32),
+        #    energy=torch.tensor(self.beam_initial_parameters[0],
+        #        dtype=torch.float32),
         #    dtype=torch.float32,
         #    device="cpu",
         # )
@@ -574,7 +598,8 @@ class BeamControlEnv(gym.Env):
         Checks if the current episode has reached a terminal state.
 
         This method determines whether the episode should end based on two conditions:
-        1. Termination: The beam has appeared on screen at least once and is now off screen.
+        1. Termination: The beam has appeared on screen at least once and is now
+            off screen.
         2. Truncation: The maximum number of steps for the episode has been reached.
 
         The method updates the 'terminated' and 'truncated' flags accordingly and
@@ -597,7 +622,8 @@ class BeamControlEnv(gym.Env):
         Apply new magnet settings to the lattice segments.
 
         Args:
-            action (np.ndarray): Array of action values to set the magnetic field parameters.
+            action (np.ndarray): Array of action values to set the magnetic
+            field parameters.
         """
         # Apply delta adjustments to the magnet settings
         self.lattice_segment.AREAMQZM1.k1 = torch.tensor(
@@ -680,7 +706,7 @@ class BeamControlEnv(gym.Env):
         for i, (segment_name, lattice_sub_segment) in enumerate(
             self.segments.items(), 1
         ):
-            # Track the incoming beam with updated magnet settings through this segment,
+            # Track the incoming beam with updated magnet settings for this segment,
             # returns ParticleBeam (particles size [32, 7])
             outgoing_beam = lattice_sub_segment.track(incoming_beam)
 
@@ -752,7 +778,8 @@ class BeamControlEnv(gym.Env):
                 # We ensure that even when beam_center is close to zero,
                 # the transformation still applies
                 positions = (
-                    beam_vertices + (self.position_scale_factor - identity) * beam_center
+                    beam_vertices
+                    + (self.position_scale_factor - identity) * beam_center
                 )
             else:
                 positions = beam_vertices
@@ -776,7 +803,8 @@ class BeamControlEnv(gym.Env):
         self.info.update(
             {
                 "segments": data,
-                # Sum of the weighted particles distribution across screen pixels
+                # Sum of the weighted particles distribution
+                # across screen pixels
                 "screen_reading": self.screen_reading.tolist(),
             }
         )
@@ -791,9 +819,11 @@ class BeamControlEnv(gym.Env):
         Computes the screen boundary based on resolution and pixel size.
 
         The boundary is calculated as half of the screen resolution multiplied
-        by the pixel size, giving the physical dimensions of the screen in meters.
+        by the pixel size, giving the physical dimensions of the screen
+        in meters.
 
         Returns:
-            np.ndarray: The screen boundary as a 2D numpy array [width, height] in meters.
+            np.ndarray: The screen boundary as a 2D numpy array [width, height]
+            in meters.
         """
         return np.array(self.screen.resolution) / 2 * np.array(self.screen.pixel_size)
