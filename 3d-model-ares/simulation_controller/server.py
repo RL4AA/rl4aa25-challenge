@@ -43,7 +43,7 @@ async def run_simulation(env: WebSocketWrapper):
             continue
 
         # Render and broadcast data to clients
-        await env.render()
+        await env.render()  # Calls WebSocketWrapper.render()
 
         # Check if we have a new control action from WebSocket
         if env.control_action is not None:
