@@ -159,6 +159,7 @@ class WebSocketWrapper(gym.Wrapper):
             # before sending new
             await asyncio.sleep(0.5)
 
+
 # Example usage in main.py
 async def main_with_wrapper():
     parser = argparse.ArgumentParser(
