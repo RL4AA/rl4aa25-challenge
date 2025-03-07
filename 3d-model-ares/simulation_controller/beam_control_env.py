@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import random
@@ -65,7 +64,7 @@ class BeamControlEnv(gym.Env):
            is within the visible screen boundaries.
     """
 
-    def __init__(self, config: dict, websocket_manager=None) -> None:
+    def __init__(self, config: dict) -> None:
         """
         Initialize BeamControlEnv.
 
@@ -82,9 +81,6 @@ class BeamControlEnv(gym.Env):
         self.render_mode = self.config["env_config"].get("render_mode", "human")
         self.host = self.config["env_config"].get("host", "localhost")
         self.port = self.config["env_config"].get("port", 8081)
-
-        # WebSocket Manager
-        self.websocket_manager = websocket_manager
 
         # Setup the main beamline lattice segment
         self.lattice_segment = cheetah.Segment.from_ocelot(
@@ -104,8 +100,13 @@ class BeamControlEnv(gym.Env):
         )
 
         # Track lattice component positions
+        # Note: For the purpose of beam animation, we consider "AREASOLA1"
+        # as the origin of the particle beam source
+        self.lattice_component_positions = OrderedDict({"AREASOLA1": 0.0})
+        self.lattice_component_positions.update(self.builder.component_positions)
+
         self.component_positions = torch.tensor(
-            list(self.builder.component_positions.values()), dtype=torch.float32
+            list(self.lattice_component_positions.values()), dtype=torch.float32
         )
 
         # Define and generate lattice segments
@@ -463,8 +464,6 @@ class BeamControlEnv(gym.Env):
         """
         Closes the WebSocket server and all client connections.
         """
-        if self.websocket_manager:
-            self.websocket_manager.close()
         super().close()
 
     def is_beam_on_screen(self) -> bool:
@@ -494,18 +493,11 @@ class BeamControlEnv(gym.Env):
         return is_on_screen
 
     async def render(self) -> None:
-        """
-        Renders simulation information and sends it via WebSocket to clients.
-        """
-        # Send the data to make it accessible to the visualizer
-        if self.render_mode == "human" and self.websocket_manager:
-            # Broadcast (i.e. sending) beam data to all connected WebSocket clients
-            await self.websocket_manager.broadcast(self.info)
-            # Add delay after broadcasting to allow animation to complete
-            # before sending new
-            await asyncio.sleep(
-                10.0
-            )  # Adjust delay as needed (e.g., 250ms = 0.25s or 20.0s or 0.226s)
+        """Prepare data for rendering, if applicable, without handling communication."""
+        if self.render_mode == "human":
+            # Optionally update self.info or perform other render-specific logic here
+            # No direct WebSocket interaction
+            pass
 
     def _set_global_seed(self, seed: int) -> None:
         """
@@ -691,7 +683,7 @@ class BeamControlEnv(gym.Env):
             [
                 incoming_beam.x,
                 incoming_beam.y,
-                incoming_beam.tau + self.component_positions[0],
+                incoming_beam.tau + self.lattice_component_positions["AREASOLA1"],
             ],
             dim=-1,
         )  # dim=-1 stacks along the last dimension
@@ -765,7 +757,7 @@ class BeamControlEnv(gym.Env):
             z = self.incoming_particle_beam.particles[:, 4]  # Column 4
 
             beam_vertices = torch.stack(
-                [x, y, z + self.builder.component_positions[segment_name]], dim=1
+                [x, y, z + self.lattice_component_positions[segment_name]], dim=1
             )
             beam_vertices *= beam_width
 
