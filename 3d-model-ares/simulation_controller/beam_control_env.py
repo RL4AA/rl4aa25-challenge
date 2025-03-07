@@ -129,8 +129,8 @@ class BeamControlEnv(gym.Env):
         # Define screen
         self.screen_name = "AREABSCR1"
         self.screen = getattr(self.lattice_segment, self.screen_name)
-        self.screen_resolution = ((2448, 2040),)
-        self.screen_pixel_size = ((3.3198e-6, 2.4469e-6),)
+        self.screen_resolution = (2448, 2040)
+        self.screen_pixel_size = (3.3198e-6, 2.4469e-6)
         self.screen.binning = 1
         self.screen.is_active = True
 
@@ -203,12 +203,14 @@ class BeamControlEnv(gym.Env):
         self.incoming_particle_beam = None
 
         # Define visual scaling factors (s_x, s_y), estimated manually
-        self.scale_x = 10  # 45  # simulated_width / physical_width
-        self.scale_y = 10  # 30  # simulated_height / physical_height
+        self.scale_x = 1  # 45  # simulated_width / physical_width
+        self.scale_y = 1  # 30  # simulated_height / physical_height
         self.position_scale_factor = torch.tensor(
             [self.scale_x, self.scale_y, 1], dtype=torch.float32
         )  # z-direction does not get scaled
-        self.beam_width_scale_factor = 1  # Scale beam width (default: 25, alt: 100000)
+        self.beam_width_scale_factor = (
+            1.0  # Scale beam width (default: 25, alt: 100000)
+        )
 
     def reset(
         self, *, seed: Optional[int] = None, options: Optional[dict] = None
@@ -673,13 +675,11 @@ class BeamControlEnv(gym.Env):
         # Data to be used to send data over WebSocket
         data = OrderedDict()
 
-        lattice_sub_segment = self.segments["AREAMQZM1"]
-
         # incoming_beam = self.incoming_beam
         incoming_beam = self.incoming_particle_beam
 
         # Stack the x, y, and modified z positions for each particle
-        positions = torch.stack(
+        beam_particle_positions = torch.stack(
             [
                 incoming_beam.x,
                 incoming_beam.y,
@@ -690,13 +690,19 @@ class BeamControlEnv(gym.Env):
 
         data["segment_0"] = {
             "segment_name": "AREASOLA1",
-            "positions": positions.tolist(),
+            "positions": beam_particle_positions.tolist(),
         }
 
         # Loop through the lattice sub-segments
         for i, (segment_name, lattice_sub_segment) in enumerate(
             self.segments.items(), 1
         ):
+            if action is not None:
+                # Apply magnet settings for this segment
+                self._apply_magnet_settings_by_name(
+                    action, segment_name, lattice_sub_segment
+                )
+
             # Track the incoming beam with updated magnet settings for this segment,
             # returns ParticleBeam (particles size [32, 7])
             outgoing_beam = lattice_sub_segment.track(incoming_beam)
@@ -756,29 +762,25 @@ class BeamControlEnv(gym.Env):
             y = self.incoming_particle_beam.particles[:, 2]  # Column 2
             z = self.incoming_particle_beam.particles[:, 4]  # Column 4
 
-            beam_vertices = torch.stack(
+            beam_particle_positions = torch.stack(
                 [x, y, z + self.lattice_component_positions[segment_name]], dim=1
             )
-            beam_vertices *= beam_width
+            beam_particle_positions *= beam_width
 
             # Apply differential scaling transformation around the beam center,
             # the transformation is linear and directionally anisotropic
             # (only affects x and y while keeping z unchanged).
-            if segment_name == self.screen_name:  # OR "AREAMCHM1" ??
+            if segment_name == self.screen_name:
                 identity = torch.ones_like(self.position_scale_factor)
                 # We ensure that even when beam_center is close to zero,
                 # the transformation still applies
-                positions = (
-                    beam_vertices
-                    + (self.position_scale_factor - identity) * beam_center
-                )
-            else:
-                positions = beam_vertices
+                beam_particle_positions = beam_particle_positions
+                +(self.position_scale_factor - identity) * beam_center
 
             # Store segment data
             data[f"segment_{i}"] = {
                 "segment_name": segment_name,
-                "positions": positions.tolist(),
+                "positions": beam_particle_positions.tolist(),
             }
 
             # Update the incoming beam for next lattice segement
@@ -799,6 +801,48 @@ class BeamControlEnv(gym.Env):
                 "screen_reading": self.screen_reading.tolist(),
             }
         )
+
+    def _apply_magnet_settings_by_name(
+        self, action: np.ndarray, segment_name: str, lattice_sub_segment
+    ) -> None:
+        """
+        Apply new magnet settings to the lattice sub-segment based on segment name.
+
+        Args:
+            action (np.ndarray): Array of 5 action values to set the magnetic field parameters.
+            segment_name (str): Name of the current lattice segment being processed.
+            lattice_sub_segment: The sub-segment object to apply settings to.
+        """
+        # Map segment names to their corresponding settings and action indices
+        segment_settings = {
+            "AREAMQZM1": ("k1", 0),  # Quadrupole
+            "AREAMQZM2": ("k1", 1),  # Quadrupole
+            "AREAMCVM1": ("angle", 2),  # Steer
+            "AREAMQZM3": ("k1", 3),  # Quadrupole
+            "AREAMCHM1": ("angle", 4),  # Steer
+        }
+
+        # Check if the current segment_name matches one we need to update
+        if segment_name in segment_settings:
+            param_name, action_idx = segment_settings[segment_name]
+
+            # Apply the action value to the appropriate parameter (k1 or angle)
+            setattr(
+                lattice_sub_segment,
+                param_name,
+                torch.tensor(action[action_idx], dtype=torch.float32),
+            )
+
+            # Clip the value using the corresponding range from action_space
+            setattr(
+                lattice_sub_segment,
+                param_name,
+                np.clip(
+                    getattr(lattice_sub_segment, param_name),
+                    self.action_space.low[action_idx],
+                    self.action_space.high[action_idx],
+                ),
+            )
 
     def _update(self) -> None:
         _ = self.lattice_segment.track(

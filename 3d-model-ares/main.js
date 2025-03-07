@@ -57,7 +57,7 @@ class SceneManager {
         this.totalProgress = 0;         // Overall progress through all segments (from 0 to 1)
 
         // Animation Properties
-        this.particleSpeed = 0.001;      // Units per frame (default: 2.0, alt: 0.001)
+        this.particleSpeed = 0.1;      // Units per frame (default: 2.0, alt: 0.001)
         this.currentData = null;       // Store latest WebSocket data
         this.animationRunning = true;  // Start with animation running
 
@@ -93,12 +93,13 @@ class SceneManager {
 
         // Axes Helper (placed after scene setup for better readability)
         // X-axis → Red (+X direction), Y-axis → Green (+Y direction), and Z-axis → Blue (+Z direction)
-        const axesHelper = new THREE.AxesHelper(1.0);
+        const axesHelper = new THREE.AxesHelper(0.25);
         axesHelper.name = "AxesHelper";
         this.scene.add(axesHelper);
 
         // Event Listeners
         this.setupEventListeners();
+        this.updateButtonLabels();
 
         // Particle System Initialization
         this.createParticles();
@@ -119,7 +120,7 @@ class SceneManager {
             1000
         );
         // Set how far the camera will start from the 3D model
-        camera.position.set(-2.5, 2.5, -2.5); // Initial camera position (x, y, z)
+        camera.position.set(-1.5, 0.75, -1.5); // Initial camera position (x, y, z)
 
         camera.updateMatrixWorld();  // Apply rotation change
 
@@ -140,7 +141,7 @@ class SceneManager {
         // Add orbit controls to the camera, enabling rotation and zoom functionality using the mouse
         const controls = new OrbitControls(this.camera, this.renderer.domElement);
 
-        controls.target.set(0.0, 0.0, 6.175); // Looking towards the center of the diagnostic screen
+        controls.target.set(0.0, 0.0, 2.0460399985313416); // Looking towards the center of the diagnostic screen
         controls.minDistance = 0;    // Minimum zoom distance (closer)
         controls.maxDistance = 40;   // Maximum zoom distance (farther)
         controls.minPolarAngle = 0;       // 0 radians (0 degrees) - Looking straight up (at the sky)
@@ -186,7 +187,7 @@ class SceneManager {
 
     setupTargetPoint() {
         // Create a small red sphere to mark the controls.target
-        const targetGeometry = new THREE.SphereGeometry(0.005, 16, 16); // Default radius: 0.01 (small red sphere)
+        const targetGeometry = new THREE.SphereGeometry(0.01, 16, 16); // Default radius: 0.01 (small red sphere)
         const targetMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000,   // Red color
             transparent: true, // Enable transparency
@@ -221,6 +222,12 @@ class SceneManager {
                 this.websocket.close();
             }
         });
+
+        // Toggle model button
+        const toggleModelButton = document.getElementById("toggle-model");
+        if (toggleModelButton) {
+            toggleModelButton.addEventListener("click", this.toggleModel.bind(this));
+        }
 
         // Click event handling
         const delta = 4;
@@ -433,23 +440,29 @@ class SceneManager {
         const layout = {
             title: {
                 text: "Particle Beam (bunch count: 0)", // Placeholder title
-                font: { family: 'Arial, sans-serif', size: 16, color: 'black' },
+                font: { family: 'Arial, sans-serif', size: 16, color: 'white' },
                 x: 0.5
             },
             xaxis: {
-                title: { text: 'X position (µm)', font: { size: 14, color: 'black' } },
+                title: { text: 'X position (µm)', font: { size: 14, color: 'white' } },
                 range: [-1000, 1000],  // Default range, will be updated dynamically
                 showgrid: true,
-                zeroline: false
+                zeroline: false,
+                tickfont: { color: 'white' },  // White tick labels
+                gridcolor: 'white'  // Optional: Dim grid lines for better visibility
              },
             yaxis: {
                 title: { text: 'Y position (µm)', font: { size: 14, color: 'black' } },
                 range: [-1000, 1000],  // Default range, will be updated dynamically
                 showgrid: true,
-                zeroline: false
+                zeroline: false,
+                tickfont: { color: 'white' },
+                gridcolor: 'white'
             },
-            margin: { t: 30, l: 80, r: 10, b: 40 },
-            autosize: true
+            margin: { l: 100, r: 0, t: 40 , b: 50 },
+            autosize: true,
+            paper_bgcolor: 'black',  // Background outside the plot area
+            plot_bgcolor: 'black'  // Keep graph area transparen
         };
 
         // Initialize an empty heatmap trace to prevent layout conflicts
@@ -461,7 +474,8 @@ class SceneManager {
             y: [...Array(2040).keys()],  // Column indices from 0 to 2039
             type: 'heatmap',
             colorscale: 'Viridis',
-            colorbar: { title: 'Bunch Count' }
+            showscale: false  // Do not include the color scale
+            //colorbar: { title: 'Bunch Count' }
         };
 
         // Initialize an empty plot with the defined layout
@@ -498,7 +512,8 @@ class SceneManager {
             y: yValues,
             type: 'heatmap',
             colorscale: 'Viridis',  // Use the 'Hot' colorscale for warm hues at high counts, alternatively,'Viridis'
-            colorbar: { title: 'Bunch Count' }
+            showscale: false  // Remove the color scale
+            //colorbar: { title: 'Bunch Count' }
         };
 
         // Retrieve the current zoom state before updating
@@ -511,7 +526,7 @@ class SceneManager {
                 font: {
                     family: 'Arial, sans-serif',
                     size: 16,
-                    color: 'black'
+                    color: 'white'
                 },
                 //xref: 'paper',
                 x: 0.5 // Centers the title
@@ -522,12 +537,14 @@ class SceneManager {
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
-                        color: 'black'
+                        color: 'white'
                     }
                 },
                 range: currentLayout ? currentLayout.xaxis.range : [xMin, xMax],  // Preserve zoom
                 showgrid: true,
-                zeroline: false //true
+                zeroline: false, //true
+                tickfont: { color: 'white' },  // White tick labels
+                gridcolor: 'white'  // Optional: Dim grid lines for better visibility
             },
             yaxis: {
                 title: {
@@ -535,17 +552,21 @@ class SceneManager {
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
-                        color: 'black'
+                        color: 'white'
                     },
                     standoff: 20 // Moves label further from the axis
                 },
                 range: currentLayout ? currentLayout.yaxis.range : [yMin, yMax],  // Preserve zoom
                 showgrid: true,
                 zeroline: false, //true
-                scaleanchor: 'x' // Ensures equal aspect ratio
+                scaleanchor: 'x', // Ensures equal aspect ratio
+                tickfont: { color: 'white' },  // White tick labels
+                gridcolor: 'white'  // Optional: Dim grid lines for better visibility
             },
-            margin: { t: 30, l: 80, r: 10, b: 40 },
-            autosize: true
+            margin: { l: 100, r: 0, t: 40 , b: 50 },
+            autosize: true,
+            paper_bgcolor: 'black',  // Background outside the plot area
+            plot_bgcolor: 'black'  // Keep graph area transparent
         };
 
         // Render the heatmap with preserved zoom
@@ -556,7 +577,7 @@ class SceneManager {
     createParticles() {
         console.log('Create particles ...');
 
-        const sphereGeometry = new THREE.SphereGeometry(0.0005, 8, 8); // Default: radius=0.001, widthSegments=8, heightSegments=8
+        const sphereGeometry = new THREE.SphereGeometry(0.0001, 8, 8); // Default: radius=0.001, widthSegments=8, heightSegments=8
         const material = new THREE.MeshBasicMaterial({
             color: 0x52FF4D, // Match original beam color
             transparent: true,
@@ -569,13 +590,13 @@ class SceneManager {
             const sphere = new THREE.Mesh(sphereGeometry, material);
 
             this.particles.push({
-                mesh: sphere,
+                mesh: sphere,  // The THREE.Mesh object for rendering
                 segment: i % this.segmentsCount, // Distribute particles across available segments
                 index: i,
                 progress: 0, // Math.random(), // Random initial progress
                 currentPosition: new THREE.Vector3(),
-                targetPosition: new THREE.Vector3(),
-                startPosition: new THREE.Vector3()
+                startPosition: new THREE.Vector3(),
+                targetPosition: new THREE.Vector3()
             });
 
             sphere.name = "Sphere_" + i;
@@ -635,11 +656,35 @@ class SceneManager {
                     this.undulatorModel.visible = false;
                 }
 
+                // Enable toggle button once both models are loaded
+                const toggleModelButton = document.getElementById("toggle-model");
+                if (toggleModelButton) toggleModelButton.disabled = false;
+
                 console.log('Undulator model loaded');
             },
             undefined,
             (error) => console.error('Error loading Undulator model:', error)
         );
+    }
+
+    toggleModel() {
+        this.hideTextBoxes();
+
+        if (this.objToRender === "ares") {
+            // Switch to Undulator
+            this.objToRender = "undulator";
+            this.aresModel.visible = false;
+            this.undulatorModel.visible = true;
+            // Toggle animationRunning to pause the loop at some point
+            this.pauseAnimation();
+        } else {
+            // Switch to Ares
+            this.objToRender = "ares";
+            this.undulatorModel.visible = false;
+            this.aresModel.visible = true;
+            // Toggle animationRunning to start the loop at some point
+            this.startAnimation();
+        }
     }
 
     findObjectByName(name) {
@@ -670,20 +715,35 @@ class SceneManager {
         if (this.animationRunning && this.newDataAvailable) {
             const deltaTime = this.getElapsedTime();
 
+            console.log("deltaTime:", deltaTime);
+
             // Update total progress based on speed and time
-            // Scale the progress increment based on desired speed and total path length
             this.totalProgress += (deltaTime * this.particleSpeed) / this.totalPathLength;
             this.totalProgress = Math.min(this.totalProgress, 1.0); // Ensure we don't exceed 1.0 (100% progress)
+            console.debug("totalProgress:", this.totalProgress);
 
             // Calculate actual distance traveled along the path
             const distanceTraveled = this.totalProgress * this.totalPathLength;
+            console.debug("distanceTraveled:", distanceTraveled);
 
             // Find current segment and progress
             const { segmentIndex, segmentProgress } = this.findCurrentSegment(distanceTraveled);
+            console.debug("segmentIndex:", segmentIndex, "segmentProgress:", segmentProgress);
 
             // Get position data for current and next segments
-            const currentSegment = this.currentData.segments[`segment_${segmentIndex}`];
-            const nextSegment = this.currentData.segments[`segment_${segmentIndex + 1}`];
+            let currentSegment = this.currentData.segments[`segment_${segmentIndex}`];
+            let nextSegment = (segmentIndex === this.segmentsCount - 1)
+                ? currentSegment
+                : this.currentData.segments[`segment_${segmentIndex + 1}`];
+
+            if (!currentSegment || (segmentIndex < this.segmentsCount - 1 && !nextSegment)) {
+                console.error(`Segment data missing: current=${segmentIndex}, next=${segmentIndex + 1}`,
+                               "Available segments:", Object.keys(this.currentData.segments));
+                this.newDataAvailable = false;
+                return;
+            }
+
+            console.debug("currentSegment:", currentSegment.segment_name, "nextSegment:", nextSegment.segment_name);
 
             // Update each particle
             this.particles.forEach((particle, i) => {
@@ -693,19 +753,18 @@ class SceneManager {
                 // Interpolate position based on constant speed progress
                 particle.mesh.position.lerpVectors(startPos, endPos, segmentProgress);
 
-                // Handle fade out in final segment
-                if (segmentIndex === this.segmentsCount - 2) {
-                    particle.mesh.material.opacity = 1.0 * (1 - segmentProgress);
+                console.debug(`Particle ${i} position:`, particle.mesh.position.z);
 
-                    if (segmentProgress >= 1.0) {
-                        this.newDataAvailable = false;
-                    }
-                } else {
-                    particle.mesh.material.opacity = 1.0;
-                }
+                // Keep particles fully visible across all segments
+                particle.mesh.material.opacity = 1.0;
                 particle.mesh.visible = true;
-            });
 
+                // Only stop animation when we reach 100% of total progress
+                if (this.totalProgress >= 1.0 && segmentIndex === this.segmentsCount - 1 && segmentProgress >= 1.0) {
+                    this.newDataAvailable = false;
+                    console.debug(`Animation completed for all ${this.segmentsCount} segments`);
+                }
+            });
         }
 
         this.renderer.render(this.scene, this.camera);
@@ -716,19 +775,21 @@ class SceneManager {
         // Get the z-axis positions array from component_positions
         const zPositions = this.currentData.component_positions;
 
-        // Set first segment start point to 0
-        this.segmentStartPoints = [0];
+        // Set first segment start point to 0 (beam starts at origin)
+        this.segmentStartPoints = [];
         this.segmentDistances = [];
         this.totalPathLength = 0;
 
-        // Use the positions up to AREABSCR1 (excluding Undulator)
-        // Assuming AREABSCR1 is at index 6 and Undulator at index 7
-        const relevantPositions = zPositions.slice(0, 7);
+        // Add initial segment from 0 to the first component
+        const initialDistance = zPositions[0]; // Distance from 0 to first position
+        this.segmentDistances.push(initialDistance);
+        this.totalPathLength += initialDistance;
+        this.segmentStartPoints.push(this.totalPathLength);
 
         // Calculate distances between consecutive positions
-        for (let i = 0; i < relevantPositions.length - 1; i++) {
+        for (let i = 0; i < zPositions.length - 1; i++) {
             // Distance is simply the difference along z-axis between consecutive points
-            const segmentDistance = relevantPositions[i + 1] - relevantPositions[i];
+            const segmentDistance = zPositions[i + 1] - zPositions[i];
 
             // Store the segment distance
             this.segmentDistances.push(segmentDistance);
@@ -753,9 +814,12 @@ class SceneManager {
             return { segmentIndex: 0, segmentProgress: 0 };
         }
 
+        console.debug("distanceTraveled:", distanceTraveled, "totalPathLength:", this.totalPathLength);
+
         // If we've exceeded the total path length, return the last segment at 100% progress
         if (distanceTraveled >= this.totalPathLength) {
-            return { segmentIndex: this.segmentsCount - 2, segmentProgress: 1.0 };
+            console.debug("Reached or exceeded total path length, returning last segment");
+            return { segmentIndex: this.segmentsCount - 1, segmentProgress: 1.0 };
         }
 
         // Iterate through the segment start points to find the current segment
@@ -763,14 +827,19 @@ class SceneManager {
 
             const segmentStart = this.segmentStartPoints[i];
             const segmentEnd = this.segmentStartPoints[i + 1];
+            console.debug("segment [start, end]", segmentStart, segmentEnd);
 
             // Check if the distance traveled is within the range of the current segment
             if (distanceTraveled >= segmentStart && distanceTraveled < segmentEnd) {
                 // Calculate progress within this segment
-                // Scale from 0 to 1 within each segment
-                const segmentDistance = this.segmentDistances[i];
+                // Scaled from 0 to 1 within each segment
+                const segmentDistance = this.segmentDistances[i+1];
                 const distanceInSegment = distanceTraveled - segmentStart;
                 const segmentProgress = distanceInSegment / segmentDistance;
+
+                console.debug("distanceInSegment: ", distanceInSegment);
+                console.debug("segmentDistance: ", segmentDistance)
+                console.debug(`Segment ${i}: ${segmentStart} to ${segmentEnd}, progress: ${segmentProgress}`);
 
                 // Return the index of the segment and the progress within it
                 return {
@@ -781,7 +850,7 @@ class SceneManager {
         }
 
         // If we've exceeded the total path length, return the last segment at 100% progress
-        return { segmentIndex: this.segmentsCount - 2, segmentProgress: 0 };
+        return { segmentIndex: this.segmentsCount - 1, segmentProgress: 0 };
     }
 
     getElapsedTime() {
@@ -852,7 +921,6 @@ class SceneManager {
                     const data = JSON.parse(event.data); // Assuming the data is in JSON format
                     console.log("WebSocket Data Update: Refreshing the scene and plot or restarting the animation!");
                     this.updateSceneFromWebSocket(data);
-                    this.newDataAvailable = true;  // Flag that new data has arrived
 
                     // Update the 2D plot dynamically
                     this.updatePlot();
@@ -895,6 +963,8 @@ class SceneManager {
         // Store current data
         this.currentData = data;
 
+        console.debug("Available segments:", Object.keys(this.currentData.segments));
+
         // Only recalculate segment distances if the structure changes
         if (this.segmentDistances.length === 0) {  // this ensures we calculate it once
             this.calculateSegmentDistances();
@@ -903,8 +973,18 @@ class SceneManager {
         // Reset progress state when new data arrives
         this.totalProgress = 0;
 
-        //  Initialize the start time per data update
+        // Initialize the start time per data update
         this.startTime = performance.now();
+
+        // Flag that new data has arrived
+        this.newDataAvailable = true;
+
+        // Reset particle positions to segment_0
+        const startSegment = this.currentData.segments['segment_0'];
+        this.particles.forEach((particle, i) => {
+            particle.mesh.position.set(...startSegment.positions[i]);
+        });
+        console.debug("Particles reset to AREASOLA1");
     }
 
     // Event Handling
@@ -980,6 +1060,13 @@ class SceneManager {
             if (textBox) {
                 textBox.hidden = false;
             }
+        }
+    }
+
+    updateButtonLabels() {
+        const toggleModelButton = document.getElementById("toggle-model");
+        if (toggleModelButton) {
+            toggleModelButton.textContent = this.translations[this.language].toggleModel;
         }
     }
 
