@@ -152,8 +152,12 @@ class WebSocketWrapper(gym.Wrapper):
     async def render(self):
         """Render the environment and broadcast data via WebSocket."""
         if hasattr(self.env, "render"):
-            await self.env.render()
+            await self.env.render()  # Let the env prepare its state
+            await self.broadcast(self.env.unwrapped.info)  # Broadcast the updated info
 
+            # Add delay after broadcasting to allow animation to complete
+            # before sending new
+            await asyncio.sleep(0.5)
 
 # Example usage in main.py
 async def main_with_wrapper():
