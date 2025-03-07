@@ -444,7 +444,7 @@ class SceneManager {
                 x: 0.5
             },
             xaxis: {
-                title: { text: 'X position (µm)', font: { size: 14, color: 'white' } },
+                title: { text: 'X position (μm)', font: { size: 14, color: 'white' } },
                 range: [-1000, 1000],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
@@ -452,14 +452,14 @@ class SceneManager {
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
              },
             yaxis: {
-                title: { text: 'Y position (µm)', font: { size: 14, color: 'black' } },
+                title: { text: 'Y position (μm)', font: { size: 14, color: 'black' } },
                 range: [-1000, 1000],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
                 tickfont: { color: 'white' },
                 gridcolor: 'white'
             },
-            margin: { l: 100, r: 0, t: 40 , b: 50 },
+            margin: { l: 100, r: 20, t: 40 , b: 50 },
             autosize: true,
             paper_bgcolor: 'black',  // Background outside the plot area
             plot_bgcolor: 'black'  // Keep graph area transparen
@@ -496,7 +496,7 @@ class SceneManager {
         const numX = this.currentData.screen_reading[0].length; // 2448 pixels
         const numY = this.currentData.screen_reading.length; // 2040 pixels
 
-        const xMin = -this.currentData.screen_boundary_x * 1e6; // Convert to µm
+        const xMin = -this.currentData.screen_boundary_x * 1e6; // Convert to μm
         const xMax = this.currentData.screen_boundary_x * 1e6;
         const yMin = -this.currentData.screen_boundary_y * 1e6;
         const yMax = this.currentData.screen_boundary_y * 1e6;
@@ -533,7 +533,7 @@ class SceneManager {
             },
             xaxis: {
                 title: {
-                    text: 'X position (µm)',
+                    text: 'X position (μm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -548,7 +548,7 @@ class SceneManager {
             },
             yaxis: {
                 title: {
-                    text: 'Y position (µm)',
+                    text: 'Y position (μm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -563,7 +563,7 @@ class SceneManager {
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
             },
-            margin: { l: 100, r: 0, t: 40 , b: 50 },
+            margin: { l: 100, r: 30, t: 40 , b: 50 },
             autosize: true,
             paper_bgcolor: 'black',  // Background outside the plot area
             plot_bgcolor: 'black'  // Keep graph area transparent
