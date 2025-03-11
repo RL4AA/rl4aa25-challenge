@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import json
 import logging
@@ -8,8 +7,6 @@ from typing import Any, Dict, Optional, Tuple
 import gymnasium as gym
 import numpy as np
 import websockets
-import yaml
-from beam_control_env import BeamControlEnv
 
 # Configure logging
 logging.basicConfig(
@@ -20,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 class WebSocketWrapper(gym.Wrapper):
     """
-    A Gym wrapper that integrates WebSocket functionality with BeamControlEnv.
+    A Gym wrapper that enables WebSocket integration for communication
+    with a Gym-based environment.
     Manages WebSocket server and client communication internally.
     """
 
@@ -61,6 +59,9 @@ class WebSocketWrapper(gym.Wrapper):
         self.connected = False
         self.server = None
 
+        # Data to be transmitted to the JavaScript web application
+        self.data = None
+
         self._control_action = np.array(
             [0, 0, 0, 0, 0], dtype=np.float32
         )  # "no-op" action
@@ -68,9 +69,6 @@ class WebSocketWrapper(gym.Wrapper):
 
         # Start the WebSocket server in a separate thread
         self._start_websocket_server()
-
-        # Data to be transmitted to the JavaScript web application
-        self.data = None
 
     @property
     def control_action(self):
@@ -156,25 +154,6 @@ class WebSocketWrapper(gym.Wrapper):
         if disconnected_clients:
             logger.info(f"Removed {len(disconnected_clients)} disconnected clients")
 
-    async def _ensure_connection(self):  # TODO: NOT IN USE
-        """
-        Ensure a WebSocket client is connected before proceeding.
-        Waits with a delay until a connection is established, or raises
-        an error if the connection timeout is exceeded.
-        """
-        import time
-
-        start_time = time.time()
-        while not self.connected:
-            if time.time() - start_time > self.connection_timeout:
-                logger.error(
-                    "Timeout: No WebSocket client connected after %d seconds.",
-                    self.connection_timeout,
-                )
-                raise RuntimeError("Failed to proceed: No WebSocket client connected.")
-            logger.info("Waiting for WebSocket client to connect...")
-            await asyncio.sleep(0.5)  # Small delay to prevent CPU overload
-
     def reset(
         self, *, seed: Optional[int] = None, options: Optional[Dict] = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -185,7 +164,7 @@ class WebSocketWrapper(gym.Wrapper):
         self, action: np.ndarray
     ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """
-        Execute a step in the environment, using WebSocket control action if available.
+        Execute a step in the environment using WebSocket control action if available.
         """
         if self.control_action is not None:
             action = self.control_action
@@ -211,46 +190,3 @@ class WebSocketWrapper(gym.Wrapper):
             # Add delay after broadcasting to allow animation to complete
             # before sending new
             await asyncio.sleep(1.0)
-
-
-# Example usage in main.py
-async def main_with_wrapper():
-    parser = argparse.ArgumentParser(
-        description="Run the BeamControlEnv simulation with WebSocket wrapper."
-    )
-    parser.add_argument(
-        "--config-path",
-        type=str,
-        default="env_configs.yml",
-        help="Path to the YAML configuration file",
-    )
-    args = parser.parse_args()
-
-    # Load configuration
-    with open(args.config_path, "r") as file:
-        config = yaml.safe_load(file)
-
-    # Initialize environment and wrap it
-    env = BeamControlEnv(config=config)
-    env = WebSocketWrapper(env)
-
-    # Run simulation
-    observation, info = env.reset()
-    done = False
-
-    while not done:
-        if not env.unwrapped.connected:
-            logger.info("Waiting for WebSocket client to connect...")
-            await asyncio.sleep(0.5)
-            continue
-
-        await env.render()
-        action = np.zeros(5, dtype=np.float32)  # Default action
-        observation, reward, terminated, truncated, info = env.step(action)
-        done = terminated or truncated
-
-    env.close()
-
-
-if __name__ == "__main__":
-    asyncio.run(main_with_wrapper())
