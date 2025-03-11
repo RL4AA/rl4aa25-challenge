@@ -1,0 +1,189 @@
+# The Docker image that will be used to build your app
+image: node:latest  # Base image with Node.js
+
+stages:
+  - setup
+  - test
+  - pages
+  - review
+  - deploy
+  - clean
+  - linkchecker
+
+before_script:
+  - node --version
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - export LC_ALL="C.UTF-8"; export LANG="en_US.UTF-8"; export LANGUAGE="en_US.UTF-8"; export TZ="Europe/Berlin"
+  - apt update && apt install -y python3 python3-venv python3-pip  # Install Python
+  # Install Chromium dependencies
+  - apt update && apt install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libgbm1 libasound2 libpangocairo-1.0-0 libxss1 libgtk-3-0
+  - python3 -m venv venv  # Create virtual environment
+  - source venv/bin/activate  # Activate it
+  - pip install --upgrade pip
+  - pip install -r simulation_controller/requirements.txt  # Install dependencies
+  - python -m pip install git+https://github.com/ocelot-collab/ocelot.git@v22.12.0
+  - pip install git+https://github.com/chrisjcc/cheetah.git@feature/3d_lattice_viewer
+
+# New job to test the full-stack app
+test:fullstack:
+  stage: test
+  script:
+    - source venv/bin/activate  # Ensure virtual environment is active
+    - npm install  # Install JS dependencies
+    - npm install -g vite@6.2.0  # Install global tools
+    - npm install -g concurrently@8.2.2  # Install global tools
+    - npm install plotly.js-dist@3.0.1
+    - npm install puppeteer@24.3.1
+    - npm run start &  # Start both servers in the background
+    - sleep 15  # Wait for servers to start (adjust as needed)
+    - |
+      node -e "const puppeteer = require('puppeteer');
+      const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+      (async () => {
+        try {
+          const browser = await puppeteer.launch({headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox']});
+          const page = await browser.newPage();
+          page.on('console', msg => console.log('Browser console:', msg.text()));
+          console.log('Navigating to http://localhost:5173/asdf...');
+          await page.goto('http://localhost:5173/asdf', {waitUntil: 'load', timeout: 120000});  // 120 seconds
+          console.log('Navigation completed.');
+          await sleep(5000);
+          const content = await page.content();
+          console.log('Page content after 5s:', content);
+          const wsConnected = await page.evaluate(() => window.WebSocket && document.getElementById('websocket-status')?.textContent.includes('Connected'));
+          console.log('WebSocket connected:', wsConnected);
+          if (!wsConnected) throw new Error('WebSocket not connected');
+          await browser.close();
+          console.log('Test completed successfully.');
+        } catch (error) {
+          console.error('Test failed:', error.message);
+          process.exit(1);
+        }
+      })();" 
+  except:
+    - main
+
+review:pages:
+  stage: pages
+  script:
+    - npm install -g vite
+    - npm install
+    - npm install plotly.js-dist
+    - npx vite build --base="https://${REVIEW_PROXY_HOST_NAME}${REVIEW_BASE_DIR}~${CI_COMMIT_REF_NAME}"
+  except:
+    - main
+  artifacts:
+    paths:
+      - dist
+  cache:
+    paths:
+      - node_modules/
+
+review:start:
+  stage: review
+  script:
+    - apt install -y openssh-client
+    - echo "$REVIEW_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - eval $(ssh-agent -s)
+    - echo "$REVIEW_SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - ssh -p "${REVIEW_SSH_PORT}" "${REVIEW_SSH_USER}"@"${REVIEW_HOST_NAME}" "mkdir -p ${REVIEW_WEBSERVER_ROOT}/~${CI_COMMIT_REF_NAME}"
+    - scp -P "${REVIEW_SSH_PORT}" -r dist/* "${REVIEW_SSH_USER}"@"${REVIEW_HOST_NAME}":"${REVIEW_WEBSERVER_ROOT}/~${CI_COMMIT_REF_NAME}"
+    - ssh -p "${REVIEW_SSH_PORT}" "${REVIEW_SSH_USER}"@"${REVIEW_HOST_NAME}" "chmod u+w -R ${REVIEW_WEBSERVER_ROOT}/*"
+    - ssh -p "${REVIEW_SSH_PORT}" "${REVIEW_SSH_USER}"@"${REVIEW_HOST_NAME}" "ls -la ${REVIEW_WEBSERVER_ROOT}/~${CI_COMMIT_REF_NAME}"
+  except:
+    - main
+  environment:
+    name: $CI_COMMIT_REF_NAME
+    url: https://${REVIEW_PROXY_HOST_NAME}${REVIEW_BASE_DIR}~${CI_COMMIT_REF_NAME}/
+    on_stop: review:stop
+
+review:stop:
+  stage: review
+  script:
+    - apt install openssh-client
+    - echo "$REVIEW_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - eval $(ssh-agent -s)
+    - echo "$REVIEW_SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - ssh -p "${REVIEW_SSH_PORT}" "${REVIEW_SSH_USER}"@"${REVIEW_HOST_NAME}" "rm -rf "${REVIEW_WEBSERVER_ROOT}/~${CI_COMMIT_REF_NAME}"
+  when: manual
+  except:
+    - main
+  environment:
+    name: $CI_COMMIT_REF_NAME
+    action: stop
+
+pages:
+  stage: pages
+  only:
+    - main
+  script:
+    - npm install -g vite
+    - npm install
+    - npm install plotly.js-dist
+    - npx vite build --base="https://$PROXY_HOST_NAME$BASE_DIR"
+  artifacts:
+    paths:
+      - dist
+  cache:
+    paths:
+      - node_modules/
+    policy: pull
+
+deploy:
+  stage: deploy
+  only:
+    - main
+  except:
+    - schedules
+  script:
+    - apt install -y openssh-client
+    - echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - scp -P "${SSH_PORT}" -r dist/* "${SSH_USER}"@"${HOST_NAME}":"${WEBSERVER_ROOT}/"
+    - ssh -p "${SSH_PORT}" "${SSH_USER}"@"${HOST_NAME}" "ls -la ${WEBSERVER_ROOT}/"
+  environment:
+    name: $CI_COMMIT_REF_NAME
+    url: https://$PROXY_HOST_NAME$BASE_DIR
+
+clean:
+  stage: clean
+  script:
+    - apk add openssh
+    - echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - ssh -p "${SSH_PORT}" "${SSH_USER}"@"${HOST_NAME}" "rm -rf ${REVIEW_WEBSERVER_ROOT}/*"
+  when: manual
+  only:
+    - main
+  environment:
+    name: $CI_COMMIT_REF_NAME
+    action: stop
+
+.linkchecker:intern:
+  stage: linkchecker
+  except:
+    - main
+  image:
+    name: linkchecker/linkchecker
+    entrypoint: [""]
+  script:
+    - linkchecker --recursion-level 10 --threads 10 --no-status --no-robots --no-warnings --ignore-url 'https://fonts.gstatic.com/{0,1}$' https://${REVIEW_PROXY_HOST_NAME}/${REVIEW_BASE_DIR}/~${CI_COMMIT_REF_NAME}/
+  when: manual
+
+.linkchecker:all:
+  stage: linkchecker
+  except:
+    - main
+  image:
+    name: linkchecker/linkchecker
+    entrypoint: [""]
+  script:
+    - linkchecker --recursion-level 10 --threads 10 --no-status --no-robots --no-warnings --check-extern --ignore-url 'https://fonts.gstatic.com/{0,1}$' https://${REVIEW_PROXY_HOST_NAME}/${REVIEW_BASE_DIR}/~${CI_COMMIT_REF_NAME}/
+  when: manual
