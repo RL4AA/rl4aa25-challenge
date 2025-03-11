@@ -85,6 +85,7 @@ class WebSocketWrapper(gym.Wrapper):
 
     def _start_websocket_server(self):
         """Start the WebSocket server in a background thread."""
+
         def run_server():
             asyncio.run(self._run_server())
 
