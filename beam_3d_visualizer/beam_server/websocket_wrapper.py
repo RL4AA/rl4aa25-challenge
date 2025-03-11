@@ -14,6 +14,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Define constants at module level
+DEFAULT_WS_HOST = "localhost"
+DEFAULT_WS_PORT = 8081
+DEFAULT_CONNECTION_TIMEOUT = 1.0
+
 
 class WebSocketWrapper(gym.Wrapper):
     """
@@ -25,21 +30,18 @@ class WebSocketWrapper(gym.Wrapper):
     def __init__(
         self,
         env: gym.Env,
-        ws_host: str = "localhost",
-        ws_port: int = 8081,
-        connection_timeout: float = 1.0,
+        ws_host: str = DEFAULT_WS_HOST,
+        ws_port: int = DEFAULT_WS_PORT,
+        connection_timeout: float = DEFAULT_CONNECTION_TIMEOUT,
     ):
         """
         Initialize the WebSocketWrapper.
 
         Args:
-            env (gym.Env): The BeamControlEnv instance to wrap
-            ws_host (str): Default hostname if not provided
-                by the environment (default: "localhost")
-            ws_port (int): Default port number if not provided
-                by the environment (default: 8081)
-            connection_timeout (float): Maximum time (in seconds) to wait for
-                a WebSocket client to connect before raising an error (default: 1.0)
+            env (gym.Env): The underlying Gym environment.
+            ws_host (str): WebSocket server hostname.
+            ws_port (int): WebSocket server port.
+            connection_timeout (float): Timeout for WebSocket connections in seconds.
         """
         super().__init__(env)
 
@@ -68,6 +70,7 @@ class WebSocketWrapper(gym.Wrapper):
         self.last_action = None  # Not used here, but included for completeness
 
         # Start the WebSocket server in a separate thread
+        self._lock = threading.Lock()
         self._start_websocket_server()
 
     @property
@@ -82,7 +85,6 @@ class WebSocketWrapper(gym.Wrapper):
 
     def _start_websocket_server(self):
         """Start the WebSocket server in a background thread."""
-
         def run_server():
             asyncio.run(self._run_server())
 
@@ -104,33 +106,35 @@ class WebSocketWrapper(gym.Wrapper):
         self, websocket: websockets.WebSocketServerProtocol, path: str = None
     ):
         """Handle incoming WebSocket connections and messages."""
-        self.connected = True
-        self.clients.add(websocket)
+        with self._lock:
+            self.connected = True
+            self.clients.add(websocket)
         logger.info("WebSocket connection established.")
 
         try:
             async for message in websocket:
-                data = json.loads(message)
-                # logger.debug(f"Received data: {data}")
-                logger.info(f"Received data: {data}")
+                try:
+                    data = json.loads(message)
+                    logger.debug(f"Received data: {data}")
 
-                if "controls" in data:
-                    self.control_action = np.array(
-                        list(data["controls"].values()), dtype=np.float32
-                    )
-                    logger.debug(f"Received control action: {self.control_action}")
-        except json.JSONDecodeError:
-            logger.error("Error: Received invalid JSON data.")
+                    if "controls" in data:
+                        self.control_action = np.array(
+                            list(data["controls"].values()),
+                            dtype=np.float32
+                        )
+                        logger.debug(f"Received control action: {self.control_action}")
+                except json.JSONDecodeError:
+                    logger.error("Error: Received invalid JSON data.")
         except asyncio.exceptions.CancelledError:
             logger.info("WebSocket task was cancelled.")
             raise
         except websockets.ConnectionClosed:
             logger.info("WebSocket connection closed by client.")
         finally:
-            if websocket in self.clients:
-                self.clients.remove(websocket)
-            if not self.clients:
-                self.connected = False
+            with self._lock:
+                self.clients.discard(websocket)
+                if not self.clients:
+                    self.connected = False
             logger.info("Client cleanup completed.")
 
     async def broadcast(self, message: Dict):
@@ -138,21 +142,8 @@ class WebSocketWrapper(gym.Wrapper):
         if not self.clients:
             return
 
-        disconnected_clients = set()
-        tasks = []
-
-        for client in self.clients:
-            try:
-                tasks.append(client.send(json.dumps(message)))
-            except websockets.ConnectionClosed:
-                disconnected_clients.add(client)
-
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-        self.clients.difference_update(disconnected_clients)
-        if disconnected_clients:
-            logger.info(f"Removed {len(disconnected_clients)} disconnected clients")
+        tasks = [client.send(json.dumps(message)) for client in self.clients]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     def reset(
         self, *, seed: Optional[int] = None, options: Optional[Dict] = None
