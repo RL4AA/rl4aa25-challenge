@@ -446,16 +446,16 @@ class SceneManager {
                 x: 0.5
             },
             xaxis: {
-                title: { text: 'X position (μm)', font: { size: 14, color: 'white' } },
-                range: [-1000, 1000],  // Default range, will be updated dynamically
+                title: { text: 'X position (mm)', font: { size: 14, color: 'white' } },
+                range: [-4, 4],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
              },
             yaxis: {
-                title: { text: 'Y position (μm)', font: { size: 14, color: 'black' } },
-                range: [-1000, 1000],  // Default range, will be updated dynamically
+                title: { text: 'Y position (mm)', font: { size: 14, color: 'black' } },
+                range: [-2, 2],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
                 tickfont: { color: 'white' },
@@ -498,10 +498,10 @@ class SceneManager {
         const numX = this.currentData.screen_reading[0].length; // 2448 pixels
         const numY = this.currentData.screen_reading.length; // 2040 pixels
 
-        const xMin = -this.currentData.screen_boundary_x * 1e6; // Convert to μm
-        const xMax = this.currentData.screen_boundary_x * 1e6;
-        const yMin = -this.currentData.screen_boundary_y * 1e6;
-        const yMax = this.currentData.screen_boundary_y * 1e6;
+        const xMin = -this.currentData.screen_boundary_x * 1e3; // Convert to mm
+        const xMax = this.currentData.screen_boundary_x * 1e3;
+        const yMin = -this.currentData.screen_boundary_y * 1e3;
+        const yMax = this.currentData.screen_boundary_y * 1e3;
 
         // Generate axis values (centers of each pixel)
         const xValues = Array.from({ length: numX }, (_, i) => xMin + (i + 0.5) * (xMax - xMin) / numX);
@@ -535,7 +535,7 @@ class SceneManager {
             },
             xaxis: {
                 title: {
-                    text: 'X position (μm)',
+                    text: 'X position (mm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -550,7 +550,7 @@ class SceneManager {
             },
             yaxis: {
                 title: {
-                    text: 'Y position (μm)',
+                    text: 'Y position (mm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -983,6 +983,7 @@ class SceneManager {
 
         // Reset particle positions to segment_0
         const startSegment = this.currentData.segments['segment_0'];
+
         this.particles.forEach((particle, i) => {
             particle.mesh.position.set(...startSegment.positions[i]);
         });
