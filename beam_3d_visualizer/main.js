@@ -57,7 +57,7 @@ class SceneManager {
         this.totalProgress = 0;         // Overall progress through all segments (from 0 to 1)
 
         // Animation Properties
-        this.particleSpeed = 0.1;      // Units per frame (default: 2.0, alt: 0.001)
+        this.particleSpeed = 0.1;      // Units per frame (default: 0.1)
         this.currentData = null;       // Store latest WebSocket data
         this.animationRunning = true;  // Start with animation running
 
@@ -300,7 +300,8 @@ class SceneManager {
             { id: 'AREAMQZM2', type: 'k1', label: 'Quad 2 (k1)', min: -72, max: 72, step: 1.0, initial: 0 },
             { id: 'AREAMCVM1', type: 'angle', label: 'Dipole 1 (angle)', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
             { id: 'AREAMQZM3', type: 'k1', label: 'Quad 3 (k1)', min: -72, max: 72, step: 0.01, initial: 0 },
-            { id: 'AREAMCHM1', type: 'angle', label: 'Dipole 2 (angle)', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 }
+            { id: 'AREAMCHM1', type: 'angle', label: 'Dipole 2 (angle)', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
+            { id: 'particleSpeed', type: 'speed', label: 'Particle Speed', min: 0.001, max: 1.0, step: 0.001, initial: 0.1 }
         ];
 
         // Create each slider element
@@ -366,6 +367,7 @@ class SceneManager {
                 this.controlSliders[id].value = this.defaultValues[id];
                 document.getElementById(`${id}-value`).textContent = this.defaultValues[id];
             });
+            // Explicitly update internal state after resetting sliders
             this.updateControls();
         });
 
@@ -1080,15 +1082,26 @@ class SceneManager {
             AREAMQZM2: parseFloat(this.controlSliders['AREAMQZM2'].value),
             AREAMCVM1: parseFloat(this.controlSliders['AREAMCVM1'].value),
             AREAMQZM3: parseFloat(this.controlSliders['AREAMQZM3'].value),
-            AREAMCHM1: parseFloat(this.controlSliders['AREAMCHM1'].value)
+            AREAMCHM1: parseFloat(this.controlSliders['AREAMCHM1'].value),
+            particleSpeed: parseFloat(this.controlSliders['particleSpeed'].value)
         };
 
+        // Always update particleSpeed to match the slider value
+        this.particleSpeed = controlValues.particleSpeed;
+        console.log(`Particle speed updated to: ${this.particleSpeed}`);
+
+        // If a specific control changed, log it
         if (changedControlId) {
+            console.log(`Control ${changedControlId} changed to: ${controlValues[changedControlId]}`);
             const slider = this.controlSliders[changedControlId];
 
-            // Determine the mapping function based on the control id.
-            // Assuming controls with 'angle' in their label (or specific ids).
-            if (changedControlId === 'AREAMCVM1' || changedControlId === 'AREAMCHM1') {
+            if (changedControlId === 'particleSpeed') {
+                // Update particleSpeed directly when its slider changes
+                this.particleSpeed = parseFloat(slider.value);
+                console.log(`Particle speed updated to: ${this.particleSpeed}`);
+            } else if (changedControlId === 'AREAMCVM1' || changedControlId === 'AREAMCHM1') {
+                // Determine the mapping function based on the control id.
+                // Assuming controls with 'angle' in their label (or specific ids).
                 controlValues[changedControlId] = parseFloat(slider.value);
             } else {
                 controlValues[changedControlId] = parseFloat(slider.value);
@@ -1100,16 +1113,21 @@ class SceneManager {
                 AREAMQZM2: parseFloat(this.controlSliders['AREAMQZM2'].value),
                 AREAMCVM1: parseFloat(this.controlSliders['AREAMCVM1'].value),
                 AREAMQZM3: parseFloat(this.controlSliders['AREAMQZM3'].value),
-                AREAMCHM1: parseFloat(this.controlSliders['AREAMCHM1'].value)
+                AREAMCHM1: parseFloat(this.controlSliders['AREAMCHM1'].value),
+                particleSpeed: parseFloat(this.controlSliders['particleSpeed'].value)
             };
         }
 
+        // If WebSocket is open, send the control values (excluding particleSpeed as it's local)
+        const wsData = { controls: { ...controlValues } };
+        delete wsData.controls.particleSpeed; // Remove particleSpeed from WebSocket data
+
         // If WebSocket is open, send the control values
-        console.log(`Sending update for ${changedControlId ? changedControlId : 'all controls'}:`, JSON.stringify({ controls: controlValues }));
+        console.log(`Sending update for ${changedControlId ? changedControlId : 'all controls'}:`, JSON.stringify(wsData));
 
         // Confirm the WebSocket is connected before sending updates:
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ controls: controlValues }));
+            this.ws.send(JSON.stringify(wsData));
         } else {
             console.warn("WebSocket not ready. Message not sent.");
         }
