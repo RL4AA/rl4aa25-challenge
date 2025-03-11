@@ -2,6 +2,7 @@ import time  # TODO Think about which of these are only used by one backend
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Literal, Optional, Union
 
 import cv2
@@ -11,7 +12,6 @@ import torch
 from gymnasium import spaces
 from scipy.ndimage import minimum_filter1d, uniform_filter1d
 
-from .. import ARESlatticeStage3v1_9 as ocelot_lattice
 from ..reward import combiners, transforms
 from ..type_aliases import CombinerLiteral, TransformLiteral
 from .base_backend import TransverseTuningBaseBackend
@@ -95,7 +95,7 @@ class TransverseTuning(gym.Env):
 
     def __init__(
         self,
-        backend: Literal["cheetah", "ocelot", "doocs", "doocs_dummy"],
+        backend: Literal["cheetah", "doocs", "doocs_dummy"],
         render_mode: Optional[Literal["human", "rgb_array"]] = None,
         action_mode: Literal["direct", "delta"] = "direct",
         magnet_init_mode: Optional[Union[Literal["random"], np.ndarray, list]] = None,
@@ -245,8 +245,6 @@ class TransverseTuning(gym.Env):
         # Setup particle simulation or control system backend
         if backend == "cheetah":
             self.backend = CheetahBackend(**backend_args)
-        elif backend == "ocelot":
-            self.backend = OcelotBackend(**backend_args)
         elif backend == "doocs_dummy":
             self.backend = DOOCSBackend(use_dummy=True, **backend_args)
         elif backend == "doocs":
@@ -545,13 +543,9 @@ class CheetahBackend(TransverseTuningBaseBackend):
         self.simulate_finite_screen = simulate_finite_screen
 
         # Simulation setup
-        self.segment = cheetah.Segment.from_ocelot(
-            ocelot_lattice.cell, warnings=False, device="cpu"
-        ).subcell("AREASOLA1", "AREABSCR1")
-
-        self.segment.AREABSCR1.resolution = (2448, 2040)
-        self.segment.AREABSCR1.pixel_size = torch.tensor((3.3198e-6, 2.4469e-6))
-        self.segment.AREABSCR1.binning = torch.tensor(1)
+        self.segment = cheetah.Segment.from_lattice_json(
+            Path(__file__).parent / "ea.json"
+        )
         self.segment.AREABSCR1.is_active = True
 
         # Spaces for domain randomisation
@@ -729,236 +723,6 @@ class CheetahBackend(TransverseTuningBaseBackend):
             info["screen_image"] = self.get_screen_image()
 
         return info
-
-
-class OcelotBackend(TransverseTuningBaseBackend):
-    """
-    Backend simulating the ARES EA in Ocelot.
-
-    :param incoming_mode: Setting for incoming beam parameters on reset. Can be
-        `"random"` to generate random parameters or an array of 11 values to set them to
-        a constant value.
-    :param max_misalignment: Maximum misalignment of magnets and the diagnostic screen
-        in meters when `misalignment_mode` is set to `"random"`. This parameter is
-        ignored when `misalignment_mode` is set to a constant value.
-    :param misalignment_mode: Setting for misalignment of magnets and the diagnostic
-        screen on reset. Can be `"random"` to generate random misalignments or an array
-        of 8 values to set them to a constant value.
-    :param include_space_charge: If `True`, space charge is included in the simulation.
-    :param charge: Charge of the beam in Coulomb.
-    :param nparticles: Number of particles in the simulation.
-    :param unit_step: Tracking step in meters.
-    """
-
-    def __init__(
-        self,
-        incoming_mode: Union[Literal["random"], np.ndarray] = "random",
-        max_misalignment: float = 5e-4,
-        misalignment_mode: Literal["constant", "random"] = "random",
-        include_space_charge: bool = True,
-        charge: float = 1e-12,  # in C
-        nparticles: int = int(1e5),
-        unit_step: float = 0.01,  # tracking step in [m]
-    ) -> None:
-        # Dynamic import for module only required by this backend
-        global ocelot, generate_parray
-        import ocelot
-        from ocelot.cpbd.beam import generate_parray
-
-        self.incoming_mode = incoming_mode
-        self.max_misalignment = max_misalignment
-        self.misalignment_mode = misalignment_mode
-
-        self.screen_resolution = (2448, 2040)
-        self.screen_pixel_size = (3.3198e-6, 2.4469e-6)
-        self.binning = 1
-
-        # Set up domain randomisation spaces
-        self.incoming_beam_space = spaces.Box(
-            low=np.array(
-                [
-                    80e6,
-                    -1e-3,
-                    -1e-4,
-                    -1e-3,
-                    -1e-4,
-                    1e-5,
-                    1e-6,
-                    1e-5,
-                    1e-6,
-                    1e-6,
-                    1e-4,
-                ],
-                dtype=np.float32,
-            ),
-            high=np.array(
-                [160e6, 1e-3, 1e-4, 1e-3, 1e-4, 5e-4, 5e-5, 5e-4, 5e-5, 5e-5, 1e-3],
-                dtype=np.float32,
-            ),
-        )
-        self.misalignment_space = spaces.Box(
-            low=-self.max_misalignment, high=self.max_misalignment, shape=(8,)
-        )
-
-        self.include_space_charge = include_space_charge
-        self.charge = charge
-        self.nparticles = nparticles
-        self.unit_step = unit_step
-
-        # Initialize Tracking method
-        self.method = ocelot.MethodTM()
-        self.method.global_method = ocelot.SecondTM
-        self.unit_step = unit_step
-
-        self.sc = ocelot.SpaceCharge()
-        self.sc.nmesh_xyz = [32, 32, 32]
-        self.sc.step = 1
-
-        # Build lattice
-        self.cell = (
-            ocelot_lattice.areasola1,
-            ocelot_lattice.drift_areasola1,
-            ocelot_lattice.areamqzm1,
-            ocelot_lattice.drift_areamqzm1,
-            ocelot_lattice.areamqzm2,
-            ocelot_lattice.drift_areamqzm2,
-            ocelot_lattice.areamcvm1,
-            ocelot_lattice.drift_areamcvm1,
-            ocelot_lattice.areamqzm3,
-            ocelot_lattice.drift_areamqzm3,
-            ocelot_lattice.areamchm1,
-            ocelot_lattice.drift_areamchm1,
-            ocelot_lattice.areabscr1,
-        )
-
-        self.lattice = ocelot.MagneticLattice(
-            self.cell,
-            start=ocelot_lattice.areasola1,
-            stop=ocelot_lattice.areabscr1,
-            method=self.method,
-        )
-
-    def is_beam_on_screen(self) -> bool:
-        beam_position = self.get_beam_parameters()[[0, 2]]
-        limits = np.array(self.screen_resolution) / 2 * np.array(self.screen_pixel_size)
-        return np.all(np.abs(beam_position) < limits)
-
-    def get_magnets(self) -> np.ndarray:
-        return np.array(
-            [
-                self.lattice[ocelot_lattice.areamqzm1].k1,
-                self.lattice[ocelot_lattice.areamqzm2].k1,
-                self.lattice[ocelot_lattice.areamcvm1].angle,
-                self.lattice[ocelot_lattice.areamqzm3].k1,
-                self.lattice[ocelot_lattice.areamchm1].angle,
-            ]
-        )
-
-    def set_magnets(self, values: Union[np.ndarray, list]) -> None:
-        self.lattice[ocelot_lattice.areamqzm1].k1 = values[0]
-        self.lattice[ocelot_lattice.areamqzm2].k1 = values[1]
-        self.lattice[ocelot_lattice.areamcvm1].angle = values[2]
-        self.lattice[ocelot_lattice.areamqzm3].k1 = values[3]
-        self.lattice[ocelot_lattice.areamqzm1].angle = values[4]
-        self.lattcie = self.lattice.update_transfer_maps()
-
-    def reset(self, options=None) -> None:
-        preprocessed_options = self._preprocess_reset_options(options)
-
-        # Set up incoming beam
-        if "incoming" in preprocessed_options:
-            incoming_parameters = preprocessed_options["incoming"]
-        elif isinstance(self.incoming_mode, np.ndarray):
-            incoming_parameters = self.incoming_mode
-        elif self.incoming_mode == "random":
-            incoming_parameters = self.incoming_beam_space.sample()
-
-        self.incoming = generate_parray(
-            sigma_x=incoming_parameters[5],
-            sigma_px=incoming_parameters[6],
-            sigma_y=incoming_parameters[7],
-            sigma_py=incoming_parameters[8],
-            sigma_tau=incoming_parameters[9],
-            sigma_p=incoming_parameters[10],
-            energy=incoming_parameters[0] / 1e9,
-            nparticles=self.nparticles,
-            charge=self.charge,
-        )
-        # Set mu_x, mu_xp, mu_y, mu_yp
-        self.incoming.rparticles[0] += incoming_parameters[1]  # mu_x
-        self.incoming.rparticles[1] += incoming_parameters[2]  # mu_xp
-        self.incoming.rparticles[2] += incoming_parameters[3]  # mu_y
-        self.incoming.rparticles[3] += incoming_parameters[4]  # # mu_yp
-
-        # Set up misalignments
-        if "misalignments" in preprocessed_options:
-            self.misalignments = preprocessed_options["misalignments"]
-        elif isinstance(self.misalignment_mode, np.ndarray):
-            self.misalignments = self.misalignment_mode
-        elif self.misalignment_mode == "random":
-            self.misalignments = self.misalignment_space.sample()
-
-        self.lattice[ocelot_lattice.areamqzm1].dx = self.misalignments[0]
-        self.lattice[ocelot_lattice.areamqzm1].dy = self.misalignments[1]
-        self.lattice[ocelot_lattice.areamqzm2].dx = self.misalignments[2]
-        self.lattice[ocelot_lattice.areamqzm2].dy = self.misalignments[3]
-        self.lattice[ocelot_lattice.areamqzm3].dx = self.misalignments[4]
-        self.lattice[ocelot_lattice.areamqzm3].dy = self.misalignments[5]
-        self.screen_misalignment = self.misalignments[6:8]
-
-    def _preprocess_reset_options(self, options: dict) -> dict:
-        """
-        Check that only valid options are passed and make it a dict if None was passed.
-        """
-        if options is None:
-            return {}
-
-        valid_options = ["incoming", "misalignments"]
-        for option in options:
-            assert option in valid_options
-
-        return options
-
-    def update(self) -> None:
-        self.outbeam = deepcopy(self.incoming)
-        navi = ocelot.Navigator(self.lattice)
-        if self.include_space_charge:
-            navi.unit_step = self.unit_step
-            navi.add_physics_proc(
-                self.sc, self.lattice.sequence[0], self.lattice.sequence[-1]
-            )
-        _, self.outbeam = ocelot.track(
-            self.lattice, self.outbeam, navi, print_progress=False
-        )
-
-    def get_beam_parameters(self) -> np.ndarray:
-        mu_x = np.mean(self.outbeam.rparticles[0])
-        sigma_x = np.std(self.outbeam.rparticles[0])
-        mu_y = np.mean(self.outbeam.rparticles[2])
-        sigma_y = np.std(self.outbeam.rparticles[2])
-
-        # Apply screen misalignment
-        mu_x -= self.screen_misalignment[0]
-        mu_y -= self.screen_misalignment[1]
-
-        return np.array([mu_x, sigma_x, mu_y, sigma_y])
-
-    def get_incoming_parameters(self) -> np.ndarray:
-        # Parameters of incoming are typed out to guarantee their order, as the
-        # order would not be guaranteed creating np.array from dict.
-        return np.array(self.incoming_parameters)
-
-    def get_misalignments(self) -> np.ndarray:
-        return np.array(self.misalignments)
-
-    def get_binning(self) -> np.ndarray:
-        return self.binning
-
-    def get_screen_resolution(self) -> np.ndarray:
-        return self.screen_resolution
-
-    def get_pixel_size(self) -> np.ndarray:
-        return self.screen_pixel_size
 
 
 class DOOCSBackend(TransverseTuningBaseBackend):
