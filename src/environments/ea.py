@@ -1,7 +1,3 @@
-import time  # TODO Think about which of these are only used by one backend
-from concurrent.futures import ThreadPoolExecutor
-from copy import deepcopy
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal, Optional, Union
 
@@ -10,7 +6,6 @@ import gymnasium as gym
 import numpy as np
 import torch
 from gymnasium import spaces
-from scipy.ndimage import minimum_filter1d, uniform_filter1d
 
 from ..reward import combiners, transforms
 from ..type_aliases import CombinerLiteral, TransformLiteral
