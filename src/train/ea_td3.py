@@ -1,31 +1,27 @@
 from functools import partial
 
 import gymnasium as gym
-import numpy as np
 import torch.nn as nn
 import wandb
 from gymnasium.wrappers import (
     FlattenObservation,
-    FrameStackObservation,
+    FrameStack,
     RecordVideo,
     RescaleAction,
     TimeLimit,
 )
 from rl_zoo3 import linear_schedule
-from stable_baselines3 import PPO
+from stable_baselines3 import TD3
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
+from src.wrappers import LogTaskStatistics, PolishedDonkeyReward
+
 from ..environments import ea
 from ..utils import save_config
-from ..wrappers import (
-    LogTaskStatistics,
-    PlotEpisode,
-    PolishedDonkeyReward,
-    RescaleObservation,
-)
+from ..wrappers import PlotEpisode, RescaleObservation
 
 
 def main() -> None:
@@ -35,7 +31,7 @@ def main() -> None:
         "max_quad_setting": 30.0,
         "max_quad_delta": 30.0,
         "max_steerer_delta": 6.1782e-3,
-        "magnet_init_mode": np.array([10.0, -10.0, 0.0, 10.0, 0.0]),
+        "magnet_init_mode": "random",
         "incoming_mode": "random",
         "misalignment_mode": "random",
         "max_misalignment": 5e-4,
@@ -64,28 +60,25 @@ def main() -> None:
         "max_episode_steps": 50,
         "polished_donkey_reward": False,
         # RL algorithm
-        "batch_size": 128,
-        "learning_rate": 0.0003,
-        "lr_schedule": "linear",  # Can be "constant" or "linear"
-        "gamma": 0.99,
         "n_envs": 40,
-        "n_steps": 128,
-        "ent_coef": 0.01,
-        "n_epochs": 10,
-        "gae_lambda": 0.95,
-        "clip_range": 0.2,
-        "clip_range_vf": None,  # None,
-        "vf_coef": 0.5,
-        "max_grad_norm": 0.5,
-        "use_sde": False,
-        "sde_sample_freq": -1,
-        "target_kl": None,
-        "total_timesteps": 5_000_000,
+        "learning_rate": 0.0003,
+        "lr_schedule": "constant",  # Can be "constant" or "linear"
+        "buffer_size": 1_000_000,
+        "learning_starts": 100,
+        "batch_size": 100,
+        "tau": 0.005,
+        "gamma": 0.99,
+        "train_freq": 40 * 50,  # (1, "episode"),
+        "gradient_steps": -1,
+        "action_noise": None,
+        "policy_delay": 2,
+        "target_policy_noise": 0.2,
+        "target_noise_clip": 0.5,
+        "total_timesteps": 1_000_000,
         # Policy
         "net_arch": "small",  # Can be "small" or "medium"
-        "activation_fn": "Tanh",  # Tanh, ReLU, GELU
-        "ortho_init": True,  # True, False
-        "log_std_init": -2.3,
+        "activation_fn": "ReLU",  # Tanh, ReLU, GELU
+        "n_critics": 2,
         # SB3 config
         "sb3_device": "auto",
         "vec_env": "subproc",
@@ -97,8 +90,8 @@ def main() -> None:
 def train(config: dict) -> None:
     # Setup wandb
     wandb.init(
-        entity="msk-ipc",
         project="ares-ea-v3",
+        entity="msk-ipc",
         sync_tensorboard=True,
         monitor_gym=True,
         config=config,
@@ -114,10 +107,7 @@ def train(config: dict) -> None:
         )
     elif config["vec_env"] == "subproc":
         vec_env = SubprocVecEnv(
-            [
-                partial(make_env, config) for _ in range(config["n_envs"])
-            ],  # TODO: Might need to be "fork" for Maxwell to terminate properly
-            start_method="fork",
+            [partial(make_env, config) for _ in range(config["n_envs"])]
         )
     else:
         raise ValueError(f"Invalid value \"{config['vec_env']}\" for dummy")
@@ -147,31 +137,32 @@ def train(config: dict) -> None:
         config["learning_rate"] = linear_schedule(config["learning_rate"])
 
     # Train
-    model = PPO(
+    model = TD3(
         "MlpPolicy",
         vec_env,
         learning_rate=config["learning_rate"],
-        n_steps=config["n_steps"],
+        buffer_size=config["buffer_size"],
+        learning_starts=config["learning_starts"],
         batch_size=config["batch_size"],
-        n_epochs=config["n_epochs"],
+        tau=config["tau"],
         gamma=config["gamma"],
-        gae_lambda=config["gae_lambda"],
-        clip_range=config["clip_range"],
-        clip_range_vf=config["clip_range_vf"],
-        ent_coef=config["ent_coef"],
-        vf_coef=config["vf_coef"],
-        max_grad_norm=config["max_grad_norm"],
-        use_sde=config["use_sde"],
-        sde_sample_freq=config["sde_sample_freq"],
-        target_kl=config["target_kl"],
+        train_freq=(
+            tuple(config["train_freq"])
+            if isinstance(config["train_freq"], list)
+            else config["train_freq"]
+        ),
+        gradient_steps=config["gradient_steps"],
+        action_noise=config["action_noise"],
+        policy_delay=config["policy_delay"],
+        target_policy_noise=config["target_policy_noise"],
+        target_noise_clip=config["target_noise_clip"],
         policy_kwargs={
             "activation_fn": getattr(nn, config["activation_fn"]),
             "net_arch": {  # From rl_zoo3
-                "small": {"pi": [64, 64], "vf": [64, 64]},
-                "medium": {"pi": [256, 256], "vf": [256, 256]},
+                "small": {"pi": [64, 64], "qf": [64, 64]},
+                "medium": {"pi": [256, 256], "qf": [256, 256]},
             }[config["net_arch"]],
-            "ortho_init": config["ortho_init"],
-            "log_std_init": config["log_std_init"],
+            "n_critics": config["n_critics"],
         },
         device=config["sb3_device"],
         tensorboard_log=f"log/{config['run_name']}",
@@ -186,15 +177,12 @@ def train(config: dict) -> None:
         callback=[eval_callback, wandb_callback],
     )
 
-    model.save(f"models/ea/ppo/{wandb.run.name}/model")
+    model.save(f"models/ea/td3/{wandb.run.name}/model")
     if (config["normalize_observation"] and config["running_obs_norm"]) or config[
         "normalize_reward"
     ]:
-        vec_env.save(f"models/ea/ppo/{wandb.run.name}/vec_normalize.pkl")
-    save_config(config, f"models/ea/ppo/{wandb.run.name}/config")
-
-    vec_env.close()
-    eval_vec_env.close()
+        vec_env.save(f"models/ea/td3/{wandb.run.name}/vec_normalize.pkl")
+    save_config(config, f"models/ea/td3/{wandb.run.name}/config")
 
 
 def make_env(
@@ -251,7 +239,7 @@ def make_env(
         env = PolishedDonkeyReward(env)
     env = FlattenObservation(env)
     if config["frame_stack"] > 1:
-        env = FrameStackObservation(env, config["frame_stack"])
+        env = FrameStack(env, config["frame_stack"])
     env = Monitor(env)
     if record_video:
         env = RecordVideo(

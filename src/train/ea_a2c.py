@@ -1,22 +1,22 @@
 from functools import partial
 
 import gymnasium as gym
-import numpy as np
 import torch.nn as nn
-import wandb
 from gymnasium.wrappers import (
     FlattenObservation,
-    FrameStackObservation,
+    FrameStack,
     RecordVideo,
     RescaleAction,
     TimeLimit,
 )
 from rl_zoo3 import linear_schedule
-from stable_baselines3 import PPO
+from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
+
+import wandb
 
 from ..environments import ea
 from ..utils import save_config
@@ -35,7 +35,7 @@ def main() -> None:
         "max_quad_setting": 30.0,
         "max_quad_delta": 30.0,
         "max_steerer_delta": 6.1782e-3,
-        "magnet_init_mode": np.array([10.0, -10.0, 0.0, 10.0, 0.0]),
+        "magnet_init_mode": "random",
         "incoming_mode": "random",
         "misalignment_mode": "random",
         "max_misalignment": 5e-4,
@@ -64,22 +64,20 @@ def main() -> None:
         "max_episode_steps": 50,
         "polished_donkey_reward": False,
         # RL algorithm
-        "batch_size": 128,
-        "learning_rate": 0.0003,
-        "lr_schedule": "linear",  # Can be "constant" or "linear"
+        "learning_rate": 0.0007,
+        "lr_schedule": "constant",  # Can be "constant" or "linear"
+        "n_steps": 5,
         "gamma": 0.99,
-        "n_envs": 40,
-        "n_steps": 128,
-        "ent_coef": 0.01,
-        "n_epochs": 10,
-        "gae_lambda": 0.95,
-        "clip_range": 0.2,
-        "clip_range_vf": None,  # None,
+        "gae_lambda": 1.0,
+        "ent_coef": 0.0,
         "vf_coef": 0.5,
         "max_grad_norm": 0.5,
+        "rms_prop_eps": 1e-5,
+        "use_rms_prop": True,
         "use_sde": False,
         "sde_sample_freq": -1,
-        "target_kl": None,
+        "normalize_advantage": False,
+        "n_envs": 40,
         "total_timesteps": 5_000_000,
         # Policy
         "net_arch": "small",  # Can be "small" or "medium"
@@ -97,8 +95,8 @@ def main() -> None:
 def train(config: dict) -> None:
     # Setup wandb
     wandb.init(
-        entity="msk-ipc",
         project="ares-ea-v3",
+        entity="msk-ipc",
         sync_tensorboard=True,
         monitor_gym=True,
         config=config,
@@ -116,8 +114,7 @@ def train(config: dict) -> None:
         vec_env = SubprocVecEnv(
             [
                 partial(make_env, config) for _ in range(config["n_envs"])
-            ],  # TODO: Might need to be "fork" for Maxwell to terminate properly
-            start_method="fork",
+            ]  # TODO: Might need to be "fork" for Maxwell to terminate properly
         )
     else:
         raise ValueError(f"Invalid value \"{config['vec_env']}\" for dummy")
@@ -147,23 +144,21 @@ def train(config: dict) -> None:
         config["learning_rate"] = linear_schedule(config["learning_rate"])
 
     # Train
-    model = PPO(
+    model = A2C(
         "MlpPolicy",
         vec_env,
         learning_rate=config["learning_rate"],
         n_steps=config["n_steps"],
-        batch_size=config["batch_size"],
-        n_epochs=config["n_epochs"],
         gamma=config["gamma"],
         gae_lambda=config["gae_lambda"],
-        clip_range=config["clip_range"],
-        clip_range_vf=config["clip_range_vf"],
         ent_coef=config["ent_coef"],
         vf_coef=config["vf_coef"],
         max_grad_norm=config["max_grad_norm"],
+        rms_prop_eps=config["rms_prop_eps"],
+        use_rms_prop=config["use_rms_prop"],
         use_sde=config["use_sde"],
         sde_sample_freq=config["sde_sample_freq"],
-        target_kl=config["target_kl"],
+        normalize_advantage=config["normalize_advantage"],
         policy_kwargs={
             "activation_fn": getattr(nn, config["activation_fn"]),
             "net_arch": {  # From rl_zoo3
@@ -186,12 +181,12 @@ def train(config: dict) -> None:
         callback=[eval_callback, wandb_callback],
     )
 
-    model.save(f"models/ea/ppo/{wandb.run.name}/model")
+    model.save(f"models/ea/a2c/{wandb.run.name}/model")
     if (config["normalize_observation"] and config["running_obs_norm"]) or config[
         "normalize_reward"
     ]:
-        vec_env.save(f"models/ea/ppo/{wandb.run.name}/vec_normalize.pkl")
-    save_config(config, f"models/ea/ppo/{wandb.run.name}/config")
+        vec_env.save(f"models/ea/a2c/{wandb.run.name}/vec_normalize.pkl")
+    save_config(config, f"models/ea/a2c/{wandb.run.name}/config")
 
     vec_env.close()
     eval_vec_env.close()
@@ -251,7 +246,7 @@ def make_env(
         env = PolishedDonkeyReward(env)
     env = FlattenObservation(env)
     if config["frame_stack"] > 1:
-        env = FrameStackObservation(env, config["frame_stack"])
+        env = FrameStack(env, config["frame_stack"])
     env = Monitor(env)
     if record_video:
         env = RecordVideo(

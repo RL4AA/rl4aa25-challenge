@@ -30,6 +30,3 @@ class FilterAction(gym.ActionWrapper):
         unfiltered[self.filter_indicies] = action
 
         return unfiltered
-
-    def action_names(self):
-        return self.env.action_names[self.filter_indicies]

@@ -104,6 +104,12 @@ class Study:
         """Compute mean of best MAEs seen until the very end of the episodes."""
         return np.mean([episode.best_mae() for episode in self.episodes])
 
+    def std_best_mae(self) -> float:
+        """
+        Compute standard deviation of best MAEs seen until the very end of the episodes.
+        """
+        return np.std([episode.best_mae() for episode in self.episodes])
+
     def median_final_mae(self) -> float:
         """
         Median of the final MAE that the algorithm stopped at (without returning to best
@@ -177,14 +183,26 @@ class Study:
         return np.std(steps) if len(steps) > 0 else None
 
     def median_steps_to_threshold(
-        self, threshold: float = 20e-6, max_steps: Optional[int] = None
+        self,
+        threshold: float = 20e-6,
+        max_steps: Optional[int] = None,
+        use_min_mae: bool = True,
+        allow_lowest_as_target: bool = False,
     ) -> Optional[float]:
         """
         Median number of steps until best seen MAE drops below (resolution) `threshold`.
         If `max_steps` is given, only consider episodes that got below threshold in less
         than `max_steps`. Returns `None` if no runs got there in less than `max_steps`.
         """
-        steps = [episode.steps_to_threshold(threshold) for episode in self.episodes]
+        steps = [
+            episode.steps_to_threshold(
+                threshold=threshold,
+                use_min_mae=use_min_mae,
+                allow_lowest_as_target=allow_lowest_as_target,
+            )
+            for episode in self.episodes
+            if episode.best_mae() < threshold
+        ]
 
         if max_steps:
             steps = np.array(steps)
@@ -193,14 +211,26 @@ class Study:
         return np.median(steps) if len(steps) > 0 else None
 
     def mean_steps_to_threshold(
-        self, threshold: float = 20e-6, max_steps: Optional[int] = None
+        self,
+        threshold: float = 20e-6,
+        max_steps: Optional[int] = None,
+        use_min_mae: bool = True,
+        allow_lowest_as_target: bool = False,
     ) -> Optional[float]:
         """
         Mean number of steps until best seen MAE drops below (resolution) `threshold`.
         If `max_steps` is given, only consider episodes that got below threshold in less
         than `max_steps`. Returns `None` if no runs got there in less than `max_steps`.
         """
-        steps = [episode.steps_to_threshold(threshold) for episode in self.episodes]
+        steps = [
+            episode.steps_to_threshold(
+                threshold=threshold,
+                use_min_mae=use_min_mae,
+                allow_lowest_as_target=allow_lowest_as_target,
+            )
+            for episode in self.episodes
+            if episode.best_mae() < threshold
+        ]
 
         if max_steps:
             steps = np.array(steps)
@@ -209,7 +239,11 @@ class Study:
         return np.mean(steps) if len(steps) > 0 else None
 
     def std_steps_to_threshold(
-        self, threshold: float = 20e-6, max_steps: Optional[int] = None
+        self,
+        threshold: float = 20e-6,
+        max_steps: Optional[int] = None,
+        use_min_mae: bool = True,
+        allow_lowest_as_target: bool = False,
     ) -> Optional[float]:
         """
         Standard deviation of number of steps until best seen MAE drops below
@@ -217,7 +251,15 @@ class Study:
         got below threshold in less than `max_steps`. Returns `None` if no runs got
         there in less than `max_steps`.
         """
-        steps = [episode.steps_to_threshold(threshold) for episode in self.episodes]
+        steps = [
+            episode.steps_to_threshold(
+                threshold=threshold,
+                use_min_mae=use_min_mae,
+                allow_lowest_as_target=allow_lowest_as_target,
+            )
+            for episode in self.episodes
+            if episode.best_mae() < threshold
+        ]
 
         if max_steps:
             steps = np.array(steps)
@@ -225,18 +267,27 @@ class Study:
 
         return np.std(steps) if len(steps) > 0 else None
 
-    def rmse(self, max_steps: Optional[int] = None) -> float:
+    def rmse(
+        self, max_steps: Optional[int] = None, use_best_beam: bool = False
+    ) -> float:
         """
         RMSE over all samples in all episode in the study and over all beam parameters
         as used in https://www.nature.com/articles/s41586-021-04301-9.
+
+        This particular implementation is similar to the Frobenius norm.
         """
-        beams = np.stack(
-            [
-                obs["beam"]
-                for episode in self.episodes
-                for obs in episode.observations[:max_steps]
-            ]
-        )
+        if use_best_beam:
+            beams = np.stack(
+                [episode.best_beam_history()[:max_steps] for episode in self.episodes]
+            ).reshape(-1, 4)
+        else:
+            beams = np.stack(
+                [
+                    obs["beam"]
+                    for episode in self.episodes
+                    for obs in episode.observations[:max_steps]
+                ]
+            )
         targets = np.stack(
             [
                 obs["target"]
@@ -246,6 +297,131 @@ class Study:
         )
         rmse = np.sqrt(np.mean(np.square(targets - beams)))
         return rmse
+
+    def median_rmse(self, use_best_beam: bool = False) -> float:
+        """
+        Median RMSE over all samples in all episode in the study and over all beam
+        parameters as used in https://www.nature.com/articles/s41586-021-04301-9.
+        """
+        episode_rmses = [
+            episode.rmse(use_best_beam=use_best_beam) for episode in self.episodes
+        ]
+        return np.median(episode_rmses)
+
+    def mean_rmse(self, use_best_beam: bool = False) -> float:
+        """
+        Mean RMSE over all samples in all episode in the study and over all beam
+        parameters as used in https://www.nature.com/articles/s41586-021-04301-9.
+        """
+        episode_rmses = [
+            episode.rmse(use_best_beam=use_best_beam) for episode in self.episodes
+        ]
+        return np.mean(episode_rmses)
+
+    def std_rmse(self, use_best_beam: bool = False) -> float:
+        """
+        Standard deviation of RMSE over all samples in all episode in the study and over
+        all beam parameters as used in
+        https://www.nature.com/articles/s41586-021-04301-9.
+        """
+        episode_rmses = [
+            episode.rmse(use_best_beam=use_best_beam) for episode in self.episodes
+        ]
+        return np.std(episode_rmses)
+
+    def median_mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Median improvement in MAE from the first to the last step of the episode.
+        Positive values indicate improvement, negative values indicate worsening.
+        """
+        improvements = [
+            episode.mae_improvement(
+                use_min_mae=use_min_mae, include_before_reset=include_before_reset
+            )
+            for episode in self.episodes
+        ]
+        return np.median(improvements)
+
+    def mean_mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Mean improvement in MAE from the first to the last step of the episode.
+        Positive values indicate improvement, negative values indicate worsening.
+        """
+        improvements = [
+            episode.mae_improvement(
+                use_min_mae=use_min_mae, include_before_reset=include_before_reset
+            )
+            for episode in self.episodes
+        ]
+        return np.mean(improvements)
+
+    def std_mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Standard deviation of improvement in MAE from the first to the last step of the
+        episode. Positive values indicate improvement, negative values indicate
+        worsening.
+        """
+        improvements = [
+            episode.mae_improvement(
+                use_min_mae=use_min_mae, include_before_reset=include_before_reset
+            )
+            for episode in self.episodes
+        ]
+        return np.std(improvements)
+
+    def median_normalized_mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Median improvement in MAE from the first to the last step of the episode,
+        normalized to the initial MAE. Positive values indicate improvement, negative
+        values indicate worsening.
+        """
+        improvements = [
+            episode.normalized_mae_improvement(
+                use_min_mae=use_min_mae, include_before_reset=include_before_reset
+            )
+            for episode in self.episodes
+        ]
+        return np.median(improvements)
+
+    def mean_normalized_mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Mean improvement in MAE from the first to the last step of the episode,
+        normalized to the initial MAE. Positive values indicate improvement, negative
+        values indicate worsening.
+        """
+        improvements = [
+            episode.normalized_mae_improvement(
+                use_min_mae=use_min_mae, include_before_reset=include_before_reset
+            )
+            for episode in self.episodes
+        ]
+        return np.mean(improvements)
+
+    def std_normalized_mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Standard deviation of improvement in MAE from the first to the last step of the
+        episode, normalized to the initial MAE. Positive values indicate improvement,
+        negative values indicate worsening.
+        """
+        improvements = [
+            episode.normalized_mae_improvement(
+                use_min_mae=use_min_mae, include_before_reset=include_before_reset
+            )
+            for episode in self.episodes
+        ]
+        return np.std(improvements)
 
     def problem_indicies(self) -> list[int]:
         """
@@ -524,7 +700,7 @@ class Study:
         plt.show()
 
     def proportion_reached_target(
-        self, threshold: float = 2e-5, max_steps: int = 50
+        self, threshold: float = 2e-5, max_steps: int = 50, use_min_mae: bool = True
     ) -> float:
         """
         Return the proportion of episodes that reached a MAE below `threshold` within
@@ -532,7 +708,12 @@ class Study:
         """
         num_reached = sum(
             np.array(
-                [episode.steps_to_threshold(threshold) for episode in self.episodes]
+                [
+                    episode.steps_to_threshold(
+                        threshold=threshold, use_min_mae=use_min_mae
+                    )
+                    for episode in self.episodes
+                ]
             )
             < max_steps
         )
@@ -557,3 +738,22 @@ class Study:
         )
         proportion = num_converged / len(self)
         return proportion
+
+    def mean_accumulated_mae(self, use_min_mae: bool = False) -> float:
+        """
+        Return the mean accumulated MAE over all episodes in the study.
+        """
+        return np.mean(
+            [episode.accumulated_mae(use_min_mae) for episode in self.episodes]
+        )
+
+    def mean_normalized_accumulated_mae(self, use_min_mae: bool = False) -> float:
+        """
+        Return the mean normalized accumulated MAE over all episodes in the study.
+        """
+        return np.mean(
+            [
+                episode.normalized_accumulated_mae(use_min_mae)
+                for episode in self.episodes
+            ]
+        )

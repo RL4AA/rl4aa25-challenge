@@ -4,8 +4,7 @@ import numpy as np
 
 class NoisyObservation(gym.ObservationWrapper):
     """
-    Add normal-distributed shot-to-shot noise to the observation of the transverse
-    tuning environments.
+    Add normal-distributed shot-to-shot noise to the observation of the transverse tuning environments.
     """
 
     def __init__(self, env: gym.Env, noise_level: float = 1e-5):

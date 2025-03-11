@@ -9,7 +9,6 @@ from typing import Literal, Optional, Union
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import scienceplots  # noqa: F401
 from scipy.ndimage import uniform_filter
 
@@ -233,9 +232,11 @@ class Episode:
         """MAE at the end of the episode."""
         return self.maes()[-1]
 
-    def maes(self) -> np.ndarray:
+    def maes(self, include_before_reset: bool = False) -> np.ndarray:
         """Get the sequence of MAEs over the episdoe."""
         beams = [obs["beam"] for obs in self.observations]
+        if include_before_reset:
+            beams = [self.infos[0]["backend_info"]["beam_before_reset"]] + beams
         target = self.observations[0]["target"]
         maes = np.mean(np.abs(np.array(beams) - np.array(target)), axis=1)
         return maes
@@ -254,11 +255,11 @@ class Episode:
 
         return magnets
 
-    def min_maes(self) -> np.ndarray:
+    def min_maes(self, include_before_reset: bool = False) -> np.ndarray:
         """
         Compute the sequences of smallest MAE seen until any given step in the episode.
         """
-        maes = self.maes()
+        maes = self.maes(include_before_reset)
         min_maes = [min(maes[: i + 1]) for i in range(len(maes))]
         return np.array(min_maes)
 
@@ -588,7 +589,11 @@ class Episode:
             palette_colors
         ), "Not enough colours for all quadrupoles."
 
-        names = [name for name in self.infos[0]["magnet_names"] if name[5] == "Q"]
+        names = [
+            name
+            for name in self.infos[0]["magnet_names"]
+            if name[0] == "Q" or (len(name) > 5 and name[5] == "Q")
+        ]
 
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -702,7 +707,11 @@ class Episode:
             palette_colors
         ), "Not enough colours for all steerers."
 
-        names = [name for name in self.infos[0]["magnet_names"] if name[5] == "C"]
+        names = [
+            name
+            for name in self.infos[0]["magnet_names"]
+            if name[0] == "C" or (len(name) > 5 and name[5] == "C")
+        ]
 
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -887,25 +896,64 @@ class Episode:
         magnets = self.magnet_history()
         magnet_names = self.infos[0]["magnet_names"]
         quadrupole_indices = [
-            i for i, name in enumerate(magnet_names) if name[5] == "Q"
+            i
+            for i, name in enumerate(magnet_names)
+            if name[0] == "Q" or (len(name) > 5 and name[5] == "Q")
         ]
         return magnets[:, quadrupole_indices]
 
-    def rmse(self) -> float:
+    def rmse(self, use_best_beam: bool = False) -> float:
         """
         RMSE over all samples in episode and over all beam parameters as used in
         https://www.nature.com/articles/s41586-021-04301-9.
         """
-        beams = np.stack([obs["beam"] for obs in self.observations])
+        beams = (
+            self.best_beam_history()
+            if use_best_beam
+            else np.stack([obs["beam"] for obs in self.observations])
+        )
         targets = np.stack([obs["target"] for obs in self.observations])
         rmse = np.sqrt(np.mean(np.square(targets - beams)))
         return rmse
 
-    def accumulated_mae(self) -> float:
+    def accumulated_mae(self, use_min_mae: bool = False) -> float:
         """
         Takes the mean of all MAEs over the episode.
         """
-        return self.maes().mean()
+        return self.maes().mean() if not use_min_mae else self.min_maes().mean()
+
+    def normalized_accumulated_mae(self, use_min_mae: bool = False) -> float:
+        """
+        Takes the mean of all MAEs over the episode and divides it by initial target
+        MAE.
+        """
+        return self.accumulated_mae(use_min_mae) / self.maes()[0]
+
+    def mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Compute the improvement in MAE over the episode. Positive values indicate
+        improvement, negative values indicate worsening.
+        """
+        maes = (
+            self.min_maes(include_before_reset)
+            if use_min_mae
+            else self.maes(include_before_reset)
+        )
+        return maes[0] - maes[-1]
+
+    def normalized_mae_improvement(
+        self, use_min_mae: bool = False, include_before_reset: bool = False
+    ) -> float:
+        """
+        Compute the improvement in MAE over the episode normalised to the initial MAE.
+        Positive values indicate improvement, negative values indicate worsening.
+        """
+        improvement = self.mae_improvement(
+            use_min_mae=use_min_mae, include_before_reset=include_before_reset
+        )
+        return improvement / self.maes(include_before_reset)[0]
 
     def screen_image_after(self):
         """
@@ -947,7 +995,11 @@ class Episode:
         """
         magnets = self.magnet_history()
         magnet_names = self.infos[0]["magnet_names"]
-        steerer_indices = [i for i, name in enumerate(magnet_names) if name[5] == "C"]
+        steerer_indices = [
+            i
+            for i, name in enumerate(magnet_names)
+            if name[0] == "C" or (len(name) > 5 and name[5] == "C")
+        ]
         return magnets[:, steerer_indices]
 
     def steps_to_convergence(
@@ -955,33 +1007,39 @@ class Episode:
     ) -> int:
         """
         Find the number of steps until the MAEs converge towards some value, i.e. change
-        no more than threshold in the future.
+        no more than threshold in the future. If no convergence is found before the last
+        step, the total number of steps in the episode is returned.
         """
-        df = pd.DataFrame({"mae": self.min_maes() if use_min_mae else self.maes()})
-        df["mae_diff"] = df["mae"].diff()
-        df["abs_mae_diff"] = df["mae_diff"].abs()
+        maes = self.min_maes() if use_min_mae else self.maes()
 
-        convergence_step = df.index.max()
-        for i in df.index:
-            x = all(df.loc[i:, "abs_mae_diff"] < threshold)
-            if x:
-                convergence_step = i
+        # Start at 1 because 0s can cause KDE on the results to fail
+        convergence_step = 1
+        for i in range(1, len(maes)):
+            convergence_step = i
+            maes_from_now_on = maes[i:]
+            if max(maes_from_now_on) - min(maes_from_now_on) < threshold:
                 break
 
         return convergence_step
 
     def steps_to_threshold(
-        self, threshold: float = 20e-6, use_min_mae: bool = True
+        self,
+        threshold: float = 20e-6,
+        use_min_mae: bool = True,
+        allow_lowest_as_target: bool = False,
     ) -> int:
         """
-        Find the number of steps until the maes in `episdoe` drop below `threshold`.
+        Find the number of steps until the maes in `episdoe` drop below `threshold`. If
+        `allow_lowest_as_target` is `True` and the threshold was never reached, the
+        number of steps until the lowest MAE is returned, otherwise return the number of
+        total steps in the episode.
         """
         maes = np.array(self.min_maes() if use_min_mae else self.maes())
         arg_lower = np.argwhere(maes < threshold).squeeze()
         if len(arg_lower.shape) == 0:  # 0-dimensional one number
             return int(arg_lower)
         elif len(arg_lower) == 0:  # 0 elements in 1-dimensional array (no result)
-            return len(maes)
+            return np.argmin(maes) if allow_lowest_as_target else len(maes)
         else:
             return arg_lower[0]
 
@@ -1050,18 +1108,37 @@ class Episode:
         best_index = np.argmin(maes)
         return self.observations[best_index]["magnets"]
 
+    def best_beam_history(self) -> np.ndarray:
+        """
+        Return the beam parameters of the best found solution at each step.
+        """
+        beams = np.array([obs["beam"] for obs in self.observations])
+        maes = self.maes()
+
+        best_beams = np.full_like(beams, np.nan)
+        for i in range(beams.shape[0]):
+            min_mae_index = np.argmin(maes[: i + 1])
+            best_beams[i] = beams[min_mae_index]
+
+        return best_beams
+
     def plot_objective_in_space(
         self,
+        fig: Optional[matplotlib.figure.Figure] = None,
         figsize: tuple[float, float] = (8, 8),
         assumed_misalignments: Optional[np.ndarray] = None,
         assumed_incoming_beam: Optional[np.ndarray] = None,
         num_objective_samples: int = 20,
+        cmap: str = "viridis",
     ) -> matplotlib.figure.Figure:
         """
         Plot the samples of the episode in the objective space slices of the best found
         solution.
         """
-        fig, axs = plt.subplots(4, 4, sharex="col", sharey="row", figsize=figsize)
+        if fig is None:
+            fig, axs = plt.subplots(4, 4, sharex="col", sharey="row", figsize=figsize)
+        else:
+            axs = fig.subplots(4, 4, sharex="col", sharey="row")
 
         episode = self.cut_off_at_threshold(threshold=4e-5)
         best_settings = episode.best_magnet_settings()
@@ -1106,7 +1183,11 @@ class Episode:
             action[0], action[4] = axs_3_0_img_x[i, j], axs_3_0_img_y[i, j]
             objectives[i, j] = get_objective_value(action)
         axs[3, 0].imshow(
-            objectives, aspect="auto", origin="lower", extent=[-30 / 72, 30 / 72, -1, 1]
+            objectives,
+            aspect="auto",
+            origin="lower",
+            extent=[-30 / 72, 30 / 72, -1, 1],
+            cmap=cmap,
         )
 
         axs_3_1_img_x, axs_3_1_img_y = np.meshgrid(quad_samples, steerer_samples)
@@ -1116,7 +1197,11 @@ class Episode:
             action[1], action[4] = axs_3_1_img_x[i, j], axs_3_1_img_y[i, j]
             objectives[i, j] = get_objective_value(action)
         axs[3, 1].imshow(
-            objectives, aspect="auto", origin="lower", extent=[-30 / 72, 30 / 72, -1, 1]
+            objectives,
+            aspect="auto",
+            origin="lower",
+            extent=[-30 / 72, 30 / 72, -1, 1],
+            cmap=cmap,
         )
 
         axs_3_2_img_x, axs_3_2_img_y = np.meshgrid(steerer_samples, steerer_samples)
@@ -1126,7 +1211,7 @@ class Episode:
             action[2], action[4] = axs_3_2_img_x[i, j], axs_3_2_img_y[i, j]
             objectives[i, j] = get_objective_value(action)
         axs[3, 2].imshow(
-            objectives, aspect="auto", origin="lower", extent=[-1, 1, -1, 1]
+            objectives, aspect="auto", origin="lower", extent=[-1, 1, -1, 1], cmap=cmap
         )
 
         axs_3_3_img_x, axs_3_3_img_y = np.meshgrid(quad_samples, steerer_samples)
@@ -1136,7 +1221,11 @@ class Episode:
             action[3], action[4] = axs_3_3_img_x[i, j], axs_3_3_img_y[i, j]
             objectives[i, j] = get_objective_value(action)
         axs[3, 3].imshow(
-            objectives, aspect="auto", origin="lower", extent=[-30 / 72, 30 / 72, -1, 1]
+            objectives,
+            aspect="auto",
+            origin="lower",
+            extent=[-30 / 72, 30 / 72, -1, 1],
+            cmap=cmap,
         )
 
         axs_2_0_img_x, axs_2_0_img_y = np.meshgrid(quad_samples, quad_samples)
@@ -1150,6 +1239,7 @@ class Episode:
             aspect="auto",
             origin="lower",
             extent=[-30 / 72, 30 / 72, -30 / 72, 30 / 72],
+            cmap=cmap,
         )
 
         axs_2_1_img_x, axs_2_1_img_y = np.meshgrid(quad_samples, quad_samples)
@@ -1163,6 +1253,7 @@ class Episode:
             aspect="auto",
             origin="lower",
             extent=[-30 / 72, 30 / 72, -30 / 72, 30 / 72],
+            cmap=cmap,
         )
 
         axs_2_2_img_x, axs_2_2_img_y = np.meshgrid(steerer_samples, quad_samples)
@@ -1172,7 +1263,11 @@ class Episode:
             action[2], action[3] = axs_2_2_img_x[i, j], axs_2_2_img_y[i, j]
             objectives[i, j] = get_objective_value(action)
         axs[2, 2].imshow(
-            objectives, aspect="auto", origin="lower", extent=[-1, 1, -30 / 72, 30 / 72]
+            objectives,
+            aspect="auto",
+            origin="lower",
+            extent=[-1, 1, -30 / 72, 30 / 72],
+            cmap=cmap,
         )
 
         axs_1_0_img_x, axs_1_0_img_y = np.meshgrid(quad_samples, steerer_samples)
@@ -1182,7 +1277,11 @@ class Episode:
             action[0], action[2] = axs_1_0_img_x[i, j], axs_1_0_img_y[i, j]
             objectives[i, j] = get_objective_value(action)
         axs[1, 0].imshow(
-            objectives, aspect="auto", origin="lower", extent=[-30 / 72, 30 / 72, -1, 1]
+            objectives,
+            aspect="auto",
+            origin="lower",
+            extent=[-30 / 72, 30 / 72, -1, 1],
+            cmap=cmap,
         )
 
         axs_1_1_img_x, axs_1_1_img_y = np.meshgrid(quad_samples, steerer_samples)
@@ -1192,7 +1291,11 @@ class Episode:
             action[1], action[2] = axs_1_1_img_x[i, j], axs_1_1_img_y[i, j]
             objectives[i, j] = get_objective_value(action)
         axs[1, 1].imshow(
-            objectives, aspect="auto", origin="lower", extent=[-30 / 72, 30 / 72, -1, 1]
+            objectives,
+            aspect="auto",
+            origin="lower",
+            extent=[-30 / 72, 30 / 72, -1, 1],
+            cmap=cmap,
         )
 
         axs_0_0_img_x, axs_0_0_img_y = np.meshgrid(quad_samples, quad_samples)
@@ -1206,6 +1309,7 @@ class Episode:
             aspect="auto",
             origin="lower",
             extent=[-30 / 72, 30 / 72, -30 / 72, 30 / 72],
+            cmap=cmap,
         )
 
         # Plot episode samples
@@ -1213,7 +1317,7 @@ class Episode:
             [obs["magnets"][0] / 72 for obs in episode.observations],
             [obs["magnets"][4] / 6.1782e-3 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[3, 0].scatter(
             [best_settings[0] / 72],
@@ -1222,14 +1326,14 @@ class Episode:
             marker="*",
             s=20,
         )
-        axs[3, 0].set_xlabel("Q1")
-        axs[3, 0].set_ylabel("CH")
+        axs[3, 0].set_xlabel(r"$Q_1$")
+        axs[3, 0].set_ylabel(r"$C_h$")
 
         axs[3, 1].scatter(
             [obs["magnets"][1] / 72 for obs in episode.observations],
             [obs["magnets"][4] / 6.1782e-3 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[3, 1].scatter(
             [best_settings[1] / 72],
@@ -1238,13 +1342,13 @@ class Episode:
             marker="*",
             s=20,
         )
-        axs[3, 1].set_xlabel("Q2")
+        axs[3, 1].set_xlabel(r"$Q_2$")
 
         axs[3, 2].scatter(
             [obs["magnets"][2] / 6.1782e-3 for obs in episode.observations],
             [obs["magnets"][4] / 6.1782e-3 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[3, 2].scatter(
             [best_settings[2] / 6.1782e-3],
@@ -1253,13 +1357,13 @@ class Episode:
             marker="*",
             s=20,
         )
-        axs[3, 2].set_xlabel("CV")
+        axs[3, 2].set_xlabel(r"$C_v$")
 
         axs[3, 3].scatter(
             [obs["magnets"][3] / 72 for obs in episode.observations],
             [obs["magnets"][4] / 6.1782e-3 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[3, 3].scatter(
             [best_settings[3] / 72],
@@ -1268,24 +1372,24 @@ class Episode:
             marker="*",
             s=20,
         )
-        axs[3, 3].set_xlabel("Q3")
+        axs[3, 3].set_xlabel(r"$Q_3$")
 
         axs[2, 0].scatter(
             [obs["magnets"][0] / 72 for obs in episode.observations],
             [obs["magnets"][3] / 72 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[2, 0].scatter(
             [best_settings[0] / 72], [best_settings[3] / 72], c="red", marker="*", s=20
         )
-        axs[2, 0].set_ylabel("Q3")
+        axs[2, 0].set_ylabel(r"$Q_3$")
 
         axs[2, 1].scatter(
             [obs["magnets"][1] / 72 for obs in episode.observations],
             [obs["magnets"][3] / 72 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[2, 1].scatter(
             [best_settings[1] / 72], [best_settings[3] / 72], c="red", marker="*", s=20
@@ -1295,7 +1399,7 @@ class Episode:
             [obs["magnets"][2] / 6.1782e-3 for obs in episode.observations],
             [obs["magnets"][3] / 72 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[2, 2].scatter(
             [best_settings[2] / 6.1782e-3],
@@ -1309,7 +1413,7 @@ class Episode:
             [obs["magnets"][0] / 72 for obs in episode.observations],
             [obs["magnets"][2] / 6.1782e-3 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[1, 0].scatter(
             [best_settings[0] / 72],
@@ -1318,13 +1422,13 @@ class Episode:
             marker="*",
             s=20,
         )
-        axs[1, 0].set_ylabel("CV")
+        axs[1, 0].set_ylabel(r"$C_v$")
 
         axs[1, 1].scatter(
             [obs["magnets"][1] / 72 for obs in episode.observations],
             [obs["magnets"][2] / 6.1782e-3 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[1, 1].scatter(
             [best_settings[1] / 72],
@@ -1338,12 +1442,12 @@ class Episode:
             [obs["magnets"][0] / 72 for obs in episode.observations],
             [obs["magnets"][1] / 72 for obs in episode.observations],
             color="black",
-            s=1,
+            s=0.8,
         )
         axs[0, 0].scatter(
             [best_settings[0] / 72], [best_settings[1] / 72], c="red", marker="*", s=20
         )
-        axs[0, 0].set_ylabel("Q2")
+        axs[0, 0].set_ylabel(r"$Q_2$")
 
         fig.subplots_adjust(wspace=0.1, hspace=0.1)
         axs[3, 0].set_xlim(-30 / 72, 30 / 72)
