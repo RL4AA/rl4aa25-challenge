@@ -3,13 +3,13 @@ from gymnasium.wrappers import RecordVideo, RescaleAction, TimeLimit
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import unwrap_wrapper
 
-from src.environments import ea
+from src.environments import bc, dl, ea, sh
 from src.wrappers import ARESeLog
 
 # TODO Test that episode trigger behaves like RecordVideo
 
 
-@pytest.mark.parametrize("section", [ea])
+@pytest.mark.parametrize("section", [ea, sh, bc, dl])
 @pytest.mark.parametrize(
     "backend", ["cheetah", pytest.param("doocs_dummy", marks=pytest.mark.doocs)]
 )

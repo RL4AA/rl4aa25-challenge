@@ -3,7 +3,7 @@ from gymnasium.wrappers import RecordVideo, RescaleAction, TimeLimit
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import unwrap_wrapper
 
-from src.environments import ea
+from src.environments import bc, dl, ea, sh
 from src.wrappers import PlotEpisode
 
 # TODO Test that episode trigger behaves like RecordVideo
@@ -13,6 +13,9 @@ from src.wrappers import PlotEpisode
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 @pytest.mark.parametrize("generate_screen_images", [True, False])
@@ -32,6 +35,9 @@ def test_check_env(section, generate_screen_images, tmp_path):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 @pytest.mark.parametrize("generate_screen_images", [True, False])

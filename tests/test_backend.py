@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.environments import ea
+from src.environments import bc, dl, ea, sh
 
 # TODO Test members for both env and backends should check after reset and step
 
@@ -11,7 +11,7 @@ def test_same_members_cheetah():
     Test that all backend classes have the same members. This should give at least some
     indication, when one implementation differs in priciple from the others.
     """
-    sections = [ea]
+    sections = [ea, dl, bc, sh]
 
     members = []
     for section in sections:
@@ -29,7 +29,7 @@ def test_same_members_doocs():
     Test that all backend classes have the same members. This should give at least some
     indication, when one implementation differs in priciple from the others.
     """
-    sections = [ea]
+    sections = [ea, dl, bc, sh]
 
     members = []
     for section in sections:
@@ -45,6 +45,9 @@ def test_same_members_doocs():
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 @pytest.mark.skip(reason="Random seeds are not fixed yet")
@@ -74,6 +77,9 @@ def test_seed(section):
     "section, misalignments",
     [
         pytest.param(ea, np.zeros(8), marks=pytest.mark.ea),
+        pytest.param(dl, np.zeros(6), marks=pytest.mark.dl),
+        pytest.param(bc, np.zeros(8), marks=pytest.mark.bc),
+        pytest.param(sh, np.zeros(6), marks=pytest.mark.sh),
     ],
 )
 def test_cheetah_fixed_incoming_mode_array_list(section, misalignments):
@@ -136,6 +142,11 @@ def test_cheetah_fixed_incoming_mode_array_list(section, misalignments):
         pytest.param(
             ea, [1e-5, 2e-5, 3e-5, 4e-5, 5e-5, 6e-5, 7e-5, 8e-5], marks=pytest.mark.ea
         ),
+        pytest.param(dl, [1e-5, 2e-5, 3e-5, 4e-5, 5e-5, 6e-5], marks=pytest.mark.dl),
+        pytest.param(
+            bc, [1e-5, 2e-5, 3e-5, 4e-5, 5e-5, 6e-5, 7e-5, 8e-5], marks=pytest.mark.bc
+        ),
+        pytest.param(sh, [1e-5, 2e-5, 3e-5, 4e-5, 5e-5, 6e-5], marks=pytest.mark.sh),
     ],
 )
 def test_cheetah_fixed_misalignment_mode_array_list(section, settings):
