@@ -14,7 +14,6 @@ from gymnasium import Wrapper
 
 from beam_3d_visualizer.beam_server.websocket_wrapper import WebSocketWrapper
 
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
