@@ -84,7 +84,6 @@ class BeamVisualizationWrapper(Wrapper):
         # Set up screen configuration
         self._initialize_screen()
 
-
     def _initialize_3d_visualization(self, is_export_enabled: bool) -> None:
         """
         Initialize the 3D visualization components.
@@ -221,7 +220,6 @@ class BeamVisualizationWrapper(Wrapper):
                 "Incoming particle beam is None. Check beam initialization in BeamControlEnv."
             )
 
-
     def step(
         self, action: np.ndarray
     ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
@@ -297,6 +295,7 @@ class BeamVisualizationWrapper(Wrapper):
         Start the JavaScript web application (Vite development server)
         in a background thread.
         """
+
         def run_web_server():
             try:
                 # Start Vite development server

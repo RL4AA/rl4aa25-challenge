@@ -119,8 +119,7 @@ class WebSocketWrapper(gym.Wrapper):
 
                     if "controls" in data:
                         self.control_action = np.array(
-                            list(data["controls"].values()),
-                            dtype=np.float32
+                            list(data["controls"].values()), dtype=np.float32
                         )
                         logger.debug(f"Received control action: {self.control_action}")
                 except json.JSONDecodeError:
