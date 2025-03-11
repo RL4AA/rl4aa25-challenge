@@ -341,8 +341,8 @@ async def main_with_wrappers():
     import argparse
 
     import yaml
-
     from beam_control_env import BeamControlEnv
+
     from websocket_wrapper import WebSocketWrapper
 
     parser = argparse.ArgumentParser(
