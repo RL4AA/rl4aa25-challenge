@@ -40,7 +40,7 @@ def main() -> None:
         "incoming_mode": "random",
         "misalignment_mode": "random",
         "max_misalignment": 5e-4,
-        "target_beam_mode": "random",
+        "target_beam_mode": np.zeros(4),
         "threshold_hold": 1,
         "clip_magnets": True,
         # Reward (also environment)
@@ -70,7 +70,7 @@ def main() -> None:
         "lr_schedule": "linear",  # Can be "constant" or "linear"
         "gamma": 0.99,
         "n_envs": 40,
-        "n_steps": 128,
+        "n_steps": 64,
         "ent_coef": 0.01,
         "n_epochs": 10,
         "gae_lambda": 0.95,
