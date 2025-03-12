@@ -1,8 +1,8 @@
 cheetah-accelerator
-gymnasium
+gymnasium==0.29.1   # Fixed for now to prevent subprocess crashing
 jupyter
 matplotlib
-rl_zoo3
+rl_zoo3==2.3.0
 SciencePlots
 scipy
 seaborn

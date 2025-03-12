@@ -5,7 +5,7 @@ import numpy as np
 import torch.nn as nn
 from gymnasium.wrappers import (
     FlattenObservation,
-    FrameStackObservation,
+    FrameStack,
     RecordVideo,
     RescaleAction,
     TimeLimit,
@@ -118,7 +118,6 @@ def train(config: dict) -> None:
             [
                 partial(make_env, config) for _ in range(config["n_envs"])
             ],  # TODO: Might need to be "fork" for Maxwell to terminate properly
-            start_method="fork",
         )
     else:
         raise ValueError(f"Invalid value \"{config['vec_env']}\" for dummy")
@@ -252,7 +251,7 @@ def make_env(
         env = PolishedDonkeyReward(env)
     env = FlattenObservation(env)
     if config["frame_stack"] > 1:
-        env = FrameStackObservation(env, config["frame_stack"])
+        env = FrameStack(env, config["frame_stack"])
     env = Monitor(env)
     if record_video:
         env = RecordVideo(
