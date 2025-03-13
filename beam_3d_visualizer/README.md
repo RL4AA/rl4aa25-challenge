@@ -31,7 +31,6 @@ npm install
 npm audit fix
 npm install plotly.js-dist@3.0.1
 npm install -g vite@6.2.0
-npm install -g concurrently@8.2.2
 ```
 
 ### 4. Run the Application
