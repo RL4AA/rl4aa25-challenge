@@ -296,11 +296,11 @@ class SceneManager {
         // Define the controls and their properties
         // Note: Although five controls are defined here, your gym observation space is (4,). Adjust as needed.
         const controls = [
-            { id: 'AREAMQZM1', type: 'k1', label: 'Quad 1 (k1)', min: -72, max: 72, step: 1.0, initial: 0 },
-            { id: 'AREAMQZM2', type: 'k1', label: 'Quad 2 (k1)', min: -72, max: 72, step: 1.0, initial: 0 },
-            { id: 'AREAMCVM1', type: 'angle', label: 'Dipole 1 (angle)', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
-            { id: 'AREAMQZM3', type: 'k1', label: 'Quad 3 (k1)', min: -72, max: 72, step: 0.01, initial: 0 },
-            { id: 'AREAMCHM1', type: 'angle', label: 'Dipole 2 (angle)', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
+            { id: 'AREAMQZM1', type: 'k1', label: 'AREAMQZM1', min: -72, max: 72, step: 1.0, initial: 0 },
+            { id: 'AREAMQZM2', type: 'k1', label: 'AREAMQZM2', min: -72, max: 72, step: 1.0, initial: 0 },
+            { id: 'AREAMCVM1', type: 'angle', label: 'AREAMCVM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
+            { id: 'AREAMQZM3', type: 'k1', label: 'AREAMQZM3', min: -72, max: 72, step: 0.01, initial: 0 },
+            { id: 'AREAMCHM1', type: 'angle', label: 'AREAMCHM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
             { id: 'particleSpeed', type: 'speed', label: 'Particle Speed', min: 0.001, max: 1.0, step: 0.001, initial: 0.1 }
         ];
 
@@ -469,14 +469,12 @@ class SceneManager {
 
         // Initialize an empty heatmap trace to prevent layout conflicts
         const trace = {
-            //z: Array(2448).fill(0).map(() => Array(2040).fill(0)), // 2448x2040 grid placeholder
-            z: Array.from({ length: 2448 }, () => Array(2040).fill(null)),  // Empty 2448x2040 placeholder grid with no color data
-            //z: Array.from({ length: 2448 }, () => Array(2040).fill(0)),
-            x: [...Array(2448).keys()],  // Row indices from 0 to 2447
-            y: [...Array(2040).keys()],  // Column indices from 0 to 2039
+            z: Array.from({ length: 510 }, () => Array(612).fill(null)),  // Empty 510x612 (y, x) placeholder grid with no color data
+            x: [...Array(612).keys()],  // Column indices from 0 to 611 (x-axis)
+            y: [...Array(510).keys()],  // Row indices from 0 to 509 (y-axis)
             type: 'heatmap',
             colorscale: 'Viridis',
-            showscale: false  // Do not include the color scale
+            showscale: true,  // Do not include the color scale
             //colorbar: { title: 'Bunch Count' }
         };
 
@@ -492,11 +490,11 @@ class SceneManager {
         }
 
         // Extract 2D bunch count array
-        const bunchCountData = this.currentData.screen_reading; // 2040 x 2448 array
+        const bunchCountData = this.currentData.screen_reading; // 510 x 612 array (y, x)
  
         // Define pixel centers based on screen boundaries
-        const numX = this.currentData.screen_reading[0].length; // 2448 pixels
-        const numY = this.currentData.screen_reading.length; // 2040 pixels
+        const numRows = bunchCountData.length; // Number of rows (y) (510 pixels)
+        const numCols = bunchCountData[0] ? bunchCountData[0].length : 0; // Number of columns (x) (612 pixels), with a check for empty array
 
         const xMin = -this.currentData.screen_boundary_x * 1e3; // Convert to mm
         const xMax = this.currentData.screen_boundary_x * 1e3;
@@ -504,17 +502,17 @@ class SceneManager {
         const yMax = this.currentData.screen_boundary_y * 1e3;
 
         // Generate axis values (centers of each pixel)
-        const xValues = Array.from({ length: numX }, (_, i) => xMin + (i + 0.5) * (xMax - xMin) / numX);
-        const yValues = Array.from({ length: numY }, (_, i) => yMin + (i + 0.5) * (yMax - yMin) / numY);
+        const xValues = Array.from({ length: numCols }, (_, i) => xMin + (i + 0.5) * (xMax - xMin) / numCols);
+        const yValues = Array.from({ length: numRows }, (_, i) => yMin + (i + 0.5) * (yMax - yMin) / numRows);
 
         // Update the heatmap histogram with new data
         const trace = {
-            z: bunchCountData,
+            z: bunchCountData, // Already in (y, x) order
             x: xValues,
             y: yValues,
             type: 'heatmap',
             colorscale: 'Viridis',  // Use the 'Hot' colorscale for warm hues at high counts, alternatively,'Viridis'
-            showscale: false  // Remove the color scale
+            showscale: true,  // Remove the color scale
             //colorbar: { title: 'Bunch Count' }
         };
 
@@ -579,7 +577,7 @@ class SceneManager {
     createParticles() {
         console.log('Create particles ...');
 
-        const sphereGeometry = new THREE.SphereGeometry(0.002, 8, 8); // Default: radius=0.001, widthSegments=8, heightSegments=8
+        const sphereGeometry = new THREE.SphereGeometry(0.001, 8, 8); // Default: radius=0.001, widthSegments=8, heightSegments=8
         const material = new THREE.MeshBasicMaterial({
             color: 0x52FF4D, // Match original beam color
             transparent: true,
@@ -1089,17 +1087,14 @@ class SceneManager {
 
         // Always update particleSpeed to match the slider value
         this.particleSpeed = controlValues.particleSpeed;
-        console.log(`Particle speed updated to: ${this.particleSpeed}`);
 
         // If a specific control changed, log it
         if (changedControlId) {
-            console.log(`Control ${changedControlId} changed to: ${controlValues[changedControlId]}`);
             const slider = this.controlSliders[changedControlId];
 
             if (changedControlId === 'particleSpeed') {
                 // Update particleSpeed directly when its slider changes
                 this.particleSpeed = parseFloat(slider.value);
-                console.log(`Particle speed updated to: ${this.particleSpeed}`);
             } else if (changedControlId === 'AREAMCVM1' || changedControlId === 'AREAMCHM1') {
                 // Determine the mapping function based on the control id.
                 // Assuming controls with 'angle' in their label (or specific ids).
@@ -1124,7 +1119,7 @@ class SceneManager {
         delete wsData.controls.particleSpeed; // Remove particleSpeed from WebSocket data
 
         // If WebSocket is open, send the control values
-        console.log(`Sending update for ${changedControlId ? changedControlId : 'all controls'}:`, JSON.stringify(wsData));
+        console.debug(`Sending update for ${changedControlId ? changedControlId : 'all controls'}:`, JSON.stringify(wsData));
 
         // Confirm the WebSocket is connected before sending updates:
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {

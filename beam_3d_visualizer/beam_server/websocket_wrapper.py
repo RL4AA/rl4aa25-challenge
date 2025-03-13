@@ -64,9 +64,7 @@ class WebSocketWrapper(gym.Wrapper):
         # Data to be transmitted to the JavaScript web application
         self.data = None
 
-        self._control_action = np.array(
-            [0, 0, 0, 0, 0], dtype=np.float32
-        )  # "no-op" action
+        self._control_action = np.zeros(5, dtype=np.float32)  # "no-op" action
         self.last_action = None  # Not used here, but included for completeness
 
         # Start the WebSocket server in a separate thread
@@ -119,10 +117,30 @@ class WebSocketWrapper(gym.Wrapper):
                     logger.debug(f"Received data: {data}")
 
                     if "controls" in data:
+                        # Update the control parameters based on the WebSocket data
+                        controls = data.get("controls", {})
+                        areamqzm1 = controls.get("AREAMQZM1", 0.0)
+                        areamqzm2 = controls.get("AREAMQZM2", 0.0)
+                        areamcvm1 = controls.get("AREAMCVM1", 0.0)
+                        areamqzm3 = controls.get("AREAMQZM3", 0.0)
+                        areamchm1 = controls.get("AREAMCHM1", 0.0)
+
+                        # Store the control action as a numpy array
                         self.control_action = np.array(
-                            list(data["controls"].values()), dtype=np.float32
+                            [areamqzm1, areamqzm2, areamcvm1, areamqzm3, areamchm1],
+                            dtype=np.float32,
                         )
-                        logger.debug(f"Received control action: {self.control_action}")
+
+                        logger.debug(
+                            "Received controls: AREAMQZM1={}, AREAMQZM2={}, "
+                            "AREAMCVM1={}, AREAMQZM3={}, AREAMCHM1={}".format(
+                                areamqzm1,
+                                areamqzm2,
+                                areamcvm1,
+                                areamqzm3,
+                                areamchm1,
+                            )
+                        )
                 except json.JSONDecodeError:
                     logger.error("Error: Received invalid JSON data.")
         except asyncio.exceptions.CancelledError:

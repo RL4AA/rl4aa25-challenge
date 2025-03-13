@@ -29,7 +29,8 @@ SCREEN_NAME = "AREABSCR1"
 DEFAULT_SCREEN_RESOLUTION = (2448, 2040)
 DEFAULT_SCREEN_PIXEL_SIZE = (3.3198e-6, 2.4469e-6)
 DEFAULT_SCREEN_BINNING = 4
-DEFAULT_SCALE_FACTOR = 100
+DEFAULT_SCALE_FACTOR = 15
+DEFAULT_RENDER_MODE = "human"
 
 
 class BeamVisualizationWrapper(Wrapper):
@@ -45,6 +46,7 @@ class BeamVisualizationWrapper(Wrapper):
         http_port: int = DEFAULT_HTTP_PORT,
         is_export_enabled: bool = False,
         num_particles: int = DEFAULT_NUM_PARTICLES,
+        render_mode: str = DEFAULT_RENDER_MODE,
     ):
         """
         Initialize the BeamVisualizationWrapper.
@@ -53,7 +55,7 @@ class BeamVisualizationWrapper(Wrapper):
             env (gym.Env): The underlying Gym environment (e.g., BeamControlEnv).
             http_host (str): Hostname for the JavaScript web application server.
             http_port (int): Port for the web application server.
-            is_export_enabled (bool): Enable 3D scene export.
+            is_export_enabled (bool): Whether to enable 3D scene export.
             num_particles (int): Number of particles to simulate in the beam.
         """
         # Internally wrap the environment with WebSocketWrapper
@@ -64,11 +66,15 @@ class BeamVisualizationWrapper(Wrapper):
         self.base_path = Path(__file__).resolve().parent
         self.http_host = http_host
         self.http_port = http_port
+        self.render_mode = render_mode
         self.num_particles = num_particles
         self.scale_factor = DEFAULT_SCALE_FACTOR
         self.current_step = 0
         self.web_process = None
         self.web_thread = None
+        self.data = OrderedDict()
+        self.is_export_enabled = is_export_enabled
+        self.screen_reading = None
 
         # Initialize state
         self.incoming_particle_beam = None
@@ -78,29 +84,31 @@ class BeamVisualizationWrapper(Wrapper):
         self._start_web_application()
 
         # Set up 3D visualization
-        self._initialize_3d_visualization(is_export_enabled)
+        self._initialize_3d_visualization()
 
         # Set up screen configuration
         self._initialize_screen()
 
-    def _initialize_3d_visualization(self, is_export_enabled: bool) -> None:
+    def _initialize_3d_visualization(self) -> None:
         """
         Initialize the 3D visualization components.
-
-        Args:
-            is_export_enabled (bool): Whether to export the 3D scene.
         """
         # Define the output file path relative to the script's directory
         output_path = self.base_path.parent / "public" / "models" / "ares" / "scene.glb"
 
-        # Set lattice segment
-        self.segment = self.env.unwrapped.segment
+        # Try to get the segment from the backend if available
+        if hasattr(self.env.unwrapped, "backend") and hasattr(
+            self.env.unwrapped.backend, "segment"
+        ):
+            self.segment = self.env.unwrapped.backend.segment
+        else:
+            self.segment = self.env.unwrapped.segment
 
         # Build and export the 3D scene
         self.builder = Segment3DBuilder(self.segment)
         self.builder.build_segment(
             output_filename=str(output_path),
-            is_export_enabled=is_export_enabled,
+            is_export_enabled=self.is_export_enabled,
         )
 
         # Note: For the purpose of beam animation, we consider BEAM_SOURCE_COMPONENT
@@ -112,7 +120,7 @@ class BeamVisualizationWrapper(Wrapper):
         self.component_positions = list(self.lattice_component_positions.values())
 
         # Data to be used to send data over WebSocket
-        self.data = OrderedDict(
+        self.data.update(
             {"component_positions": self.component_positions, "segments": {}}
         )
 
@@ -120,7 +128,14 @@ class BeamVisualizationWrapper(Wrapper):
         """Initialize the screen configuration for beam visualization."""
         # Define screen
         self.screen_name = SCREEN_NAME
-        self.screen = getattr(self.segment, self.screen_name)
+
+        # Try to get the segment from the backend if available
+        if hasattr(self.env.unwrapped, "backend") and hasattr(
+            self.env.unwrapped.backend, "segment"
+        ):
+            self.screen = getattr(self.env.unwrapped.backend.segment, self.screen_name)
+        else:
+            self.screen = getattr(self.env.unwrapped.segment, self.screen_name)
         self.screen_resolution = DEFAULT_SCREEN_RESOLUTION
         self.screen_pixel_size = DEFAULT_SCREEN_PIXEL_SIZE
         self.screen.binning = DEFAULT_SCREEN_BINNING
@@ -157,6 +172,16 @@ class BeamVisualizationWrapper(Wrapper):
         """
         self.env.control_action = value
 
+    @property
+    def render_mode(self):
+        """Get the render mode."""
+        return self._render_mode
+
+    @render_mode.setter
+    def render_mode(self, value):
+        """Set the render mode."""
+        self._render_mode = value
+
     def reset(
         self, *, seed: Optional[int] = None, options: Optional[Dict] = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -177,8 +202,10 @@ class BeamVisualizationWrapper(Wrapper):
         # Reset the underlying environment
         observation, info = self.env.reset(seed=seed, options=options)
 
-        # Initialize the particle beam
-        self._initialize_particle_beam()
+        # Read screen image
+        image = info["backend_info"]["screen_image"]
+        image = image.T
+        self.screen_reading = np.flip(image, axis=0)  # Flip along y-axis
 
         # Run simulation
         self._simulate()
@@ -216,8 +243,13 @@ class BeamVisualizationWrapper(Wrapper):
 
         if self.incoming_particle_beam is None:
             raise ValueError(
-                "Incoming particle beam is None. Check beam initialization in BeamControlEnv."
+                "Incoming particle beam is None. Check beam initialization."
             )
+
+        # Log the initial beam state for debugging
+        logger.debug(
+            f"Initialized incoming particle beam with {self.num_particles} particles."
+        )
 
     def step(
         self, action: np.ndarray
@@ -238,6 +270,11 @@ class BeamVisualizationWrapper(Wrapper):
         # Execute step in the underlying environment
         observation, reward, terminated, truncated, info = self.env.step(action)
 
+        # Read screen image
+        image = info["backend_info"]["screen_image"]
+        image = image.T
+        self.screen_reading = np.flip(image, axis=0)  # Flip along y-axis
+
         # Run simulation with the new state
         self._simulate()
 
@@ -245,18 +282,26 @@ class BeamVisualizationWrapper(Wrapper):
 
     async def render(self):
         """
-        Render the environment by preparing simulation data and delegating
-        to the inner wrapper.
+        Render the environment by preparing simulation data and broadcasting it
+        via WebSocket.
+        This method does not rely on the underlying environment's render method, as all
+        visualization logic is handled by this wrapper.
 
         Note: The simulation data is already updated in step() or reset(),
         so we don't need to call _simulate() again here.
         """
+        if self.render_mode != "human":
+            return  # Skip rendering if not in human mode
+
         # Update WebSocket broadcasting data
         self.env.data = self.data
 
-        # Delegate to the inner wrapper (WebSocketWrapper) for broadcasting
-        if hasattr(self.env, "render"):
-            await self.env.render()
+        # Delegate to WebSocketWrapper for broadcasting
+        await self.env.broadcast(self.data)
+
+        # Add delay after broadcasting to allow animation to complete
+        # before sending new data
+        await asyncio.sleep(1.0)
 
     def close(self):
         """
@@ -347,6 +392,10 @@ class BeamVisualizationWrapper(Wrapper):
         self.data["segments"] = {}
         segment_index = 0
 
+        # Reinitialize the incoming particle beam to ensure a fresh start
+        # (i.e. initial state) at AREASOLA1
+        self._initialize_particle_beam()
+
         # Track beam through each lattice element
         for element in self.segment.elements:
             if element.name in list(self.lattice_component_positions.keys()):
@@ -368,11 +417,15 @@ class BeamVisualizationWrapper(Wrapper):
 
                 # Compute the mean position of the bunch
                 mean_position = positions.mean(dim=0, keepdim=True)
+                std_position = positions.std(dim=0, keepdim=True)
 
                 # Spread out positions without altering the mean
                 positions = (
                     positions - mean_position
                 ) * self.scale_factor + mean_position
+
+                # Scale both the mean and the spread
+                # positions = positions * self.scale_factor
 
                 # Store segment data
                 self.data["segments"][f"segment_{segment_index}"] = {
@@ -386,14 +439,23 @@ class BeamVisualizationWrapper(Wrapper):
                 # Update the incoming beam for the next lattice segment
                 self.incoming_particle_beam = outgoing_beam
 
-        # Get screen pixel reading
-        screen_reading = self.env.unwrapped.segment.AREABSCR1.reading
+        # Try to get the segment from the backend if available
+        if hasattr(self.env.unwrapped, "backend"):
+            # Get screen pixel reading
+            info = self.env.unwrapped.backend.get_info()
+            # img = self.env.unwrapped.backend.get_screen_image()
+            screen_reading = info["screen_image"]
+        else:
+            screen_reading = self.segment.AREABSCR1.reading
+
         self.current_step += 1
 
         # Update meta info to include particle reading from segments
         self.data.update(
             {
-                "screen_reading": screen_reading.tolist(),
+                "screen_reading": self.screen_reading.tolist(),
                 "bunch_count": self.current_step,
             }
         )
+
+        # self.render()
