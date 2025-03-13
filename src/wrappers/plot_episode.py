@@ -3,8 +3,10 @@ from pathlib import Path
 from typing import Callable
 
 import gymnasium as gym
-import wandb
+import matplotlib.pyplot as plt
 from gymnasium import logger
+
+import wandb
 
 from ..eval import Episode
 
@@ -143,3 +145,5 @@ class PlotEpisode(gym.Wrapper):
 
         if self.log_to_wandb and wandb.run:
             wandb.log({"plots": fig})
+
+        plt.close(fig)
