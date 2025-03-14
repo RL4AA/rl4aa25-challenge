@@ -1,0 +1,29 @@
+name: rl4aa25-tutorial
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.12.9
+  - pip>=25.0.1
+  - pip:
+      - black
+      - botorch
+      - cheetah-accelerator==0.7.0
+      - flake8
+      - gymnasium[other]==1.0.0
+      - ipympl
+      - ipywidgets
+      - isort
+      - jupyter
+      - matplotlib
+      - numpy
+      - opencv-python
+      - pytest
+      - rl_zoo3
+      - SciencePlots
+      - scipy
+      - seaborn
+      - stable-baselines3==2.4.0
+      - tensorboard
+      - tqdm
+      - wandb
+      - xopt>=2.0.0
