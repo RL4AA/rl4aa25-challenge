@@ -301,7 +301,10 @@ class SceneManager {
             { id: 'AREAMCVM1', type: 'angle', label: 'AREAMCVM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
             { id: 'AREAMQZM3', type: 'k1', label: 'AREAMQZM3', min: -72, max: 72, step: 0.01, initial: 0 },
             { id: 'AREAMCHM1', type: 'angle', label: 'AREAMCHM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
-            { id: 'particleSpeed', type: 'speed', label: 'Particle Speed', min: 0.001, max: 1.0, step: 0.001, initial: 0.1 }
+            { id: 'particleSpeed', type: 'speed', label: 'Particle Speed', min: 0.001, max: 1.0, step: 0.001, initial: 0.1 },
+            { id: 'scaleBeamSpread', type: 'speed', label: 'Scale beam width', min: 1.0, max: 100.0, step: 1.0, initial: 15.0 },
+            { id: 'scaleBeamPosition', type: 'speed', label: 'Scale beam position', min: 1.0, max: 15.0, step: 1, initial: 10.0 }
+
         ];
 
         // Create each slider element
@@ -1082,7 +1085,9 @@ class SceneManager {
             AREAMCVM1: parseFloat(this.controlSliders['AREAMCVM1'].value),
             AREAMQZM3: parseFloat(this.controlSliders['AREAMQZM3'].value),
             AREAMCHM1: parseFloat(this.controlSliders['AREAMCHM1'].value),
-            particleSpeed: parseFloat(this.controlSliders['particleSpeed'].value)
+            particleSpeed: parseFloat(this.controlSliders['particleSpeed'].value),
+            scaleBeamSpread: parseFloat(this.controlSliders['scaleBeamSpread'].value),
+            scaleBeamPosition: parseFloat(this.controlSliders['scaleBeamPosition'].value)
         };
 
         // Always update particleSpeed to match the slider value
@@ -1110,7 +1115,9 @@ class SceneManager {
                 AREAMCVM1: parseFloat(this.controlSliders['AREAMCVM1'].value),
                 AREAMQZM3: parseFloat(this.controlSliders['AREAMQZM3'].value),
                 AREAMCHM1: parseFloat(this.controlSliders['AREAMCHM1'].value),
-                particleSpeed: parseFloat(this.controlSliders['particleSpeed'].value)
+                particleSpeed: parseFloat(this.controlSliders['particleSpeed'].value),
+                scaleBeamSpread: parseFloat(this.controlSliders['scaleBeamSpread'].value),
+                scaleBeamPosition: parseFloat(this.controlSliders['scaleBeamPosition'].value)
             };
         }
 

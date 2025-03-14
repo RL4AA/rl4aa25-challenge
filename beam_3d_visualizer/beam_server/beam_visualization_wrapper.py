@@ -29,7 +29,6 @@ SCREEN_NAME = "AREABSCR1"
 DEFAULT_SCREEN_RESOLUTION = (2448, 2040)
 DEFAULT_SCREEN_PIXEL_SIZE = (3.3198e-6, 2.4469e-6)
 DEFAULT_SCREEN_BINNING = 4
-DEFAULT_SCALE_FACTOR = 15
 DEFAULT_RENDER_MODE = "human"
 
 
@@ -59,8 +58,8 @@ class BeamVisualizationWrapper(Wrapper):
             num_particles (int): Number of particles to simulate in the beam.
         """
         # Internally wrap the environment with WebSocketWrapper
-        env = WebSocketWrapper(env)
-        super().__init__(env)
+        self.ws_env = WebSocketWrapper(env)
+        super().__init__(self.ws_env)
 
         # Basic configuration
         self.base_path = Path(__file__).resolve().parent
@@ -68,7 +67,8 @@ class BeamVisualizationWrapper(Wrapper):
         self.http_port = http_port
         self.render_mode = render_mode
         self.num_particles = num_particles
-        self.scale_factor = DEFAULT_SCALE_FACTOR
+        self.spread_scale_factor = self.ws_env.spread_scale_factor
+        self.mean_scale_factor = self.ws_env.mean_scale_factor
         self.current_step = 0
         self.web_process = None
         self.web_thread = None
@@ -136,6 +136,7 @@ class BeamVisualizationWrapper(Wrapper):
             self.screen = getattr(self.env.unwrapped.backend.segment, self.screen_name)
         else:
             self.screen = getattr(self.env.unwrapped.segment, self.screen_name)
+
         self.screen_resolution = DEFAULT_SCREEN_RESOLUTION
         self.screen_pixel_size = DEFAULT_SCREEN_PIXEL_SIZE
         self.screen.binning = DEFAULT_SCREEN_BINNING
@@ -275,7 +276,7 @@ class BeamVisualizationWrapper(Wrapper):
         image = image.T
         self.screen_reading = np.flip(image, axis=0)  # Flip along y-axis
 
-        # Run simulation with the new state
+        # Run simulation
         self._simulate()
 
         return observation, reward, terminated, truncated, info
@@ -397,18 +398,41 @@ class BeamVisualizationWrapper(Wrapper):
         self._initialize_particle_beam()
 
         # Track beam through each lattice element
+        references = [self.incoming_particle_beam]
         for element in self.segment.elements:
-            if element.name in list(self.lattice_component_positions.keys()):
-                # Track beam through this element
-                outgoing_beam = element.track(self.incoming_particle_beam)
-                logger.debug(
-                    f"Tracked beam through element {element.name}: {outgoing_beam}"
-                )
+            # Track beam through this element
+            outgoing_beam = element.track(references[-1])
+            references.append(outgoing_beam)
 
+            logger.debug(
+                f"Tracked beam through element {element.name}: {outgoing_beam}"
+            )
+
+            # Only store particle positions for elements in lattice_component_positions
+            if element.name in self.lattice_component_positions:
                 # Extract particle positions
-                x = outgoing_beam.particles[:, 0]  # Column 0
+                x = -outgoing_beam.particles[:, 0]  # Column 0
                 y = outgoing_beam.particles[:, 2]  # Column 2
-                z = outgoing_beam.particles[:, 4]  # Column 4
+                z = -outgoing_beam.particles[:, 4]  # Column 4
+
+                # Note: In Cheetah, the coordinates of the particles are defined
+                # by a 7-dimensional vector: x = (x, p_x, y, p_y, 𝜏, 1),
+                # where 𝜏 = t - t_0 represents the time offset of a particle
+                # relative to the reference particle.
+                #
+                # Since we use z to represent the `longitudinal position` of particles
+                # in the beamline (instead of time offset), we flip the sign of 𝜏.
+                #
+                # This ensures that particles:
+                # - `ahead` of the reference particle (bunch head) have `positive` z,
+                # - `behind` the reference particle (bunch tail) have `negative` z.
+                #
+                # This sign convention aligns with spatial representations
+                # of beam bunches, where a leading particle has a larger
+                # longitudinal position z.
+                #
+                # Source:
+                # https://cheetah-accelerator.readthedocs.io/en/latest/coordinate_system.html
 
                 # Shift beam particles 3D position in reference to segment component
                 positions = torch.stack(
@@ -417,15 +441,32 @@ class BeamVisualizationWrapper(Wrapper):
 
                 # Compute the mean position of the bunch
                 mean_position = positions.mean(dim=0, keepdim=True)
-                std_position = positions.std(dim=0, keepdim=True)
 
-                # Spread out positions without altering the mean
-                positions = (
+                # Scale the spread (deviation from mean) using spread_scale_factor
+                spread_scaled = (
                     positions - mean_position
-                ) * self.scale_factor + mean_position
+                ) * self.ws_env.spread_scale_factor
 
-                # Scale both the mean and the spread
-                # positions = positions * self.scale_factor
+                # Scale the mean position using mean_scale_factor
+                # Note: We only scale x and y components, leaving z unchanged
+                mean_scaled = mean_position.clone()
+
+                if element.name == SCREEN_NAME:
+                    # Apply amplification only to x and y components (index 0 and 1),
+                    # leaving z unchanged
+                    mean_scaled[0, 0] = self._amplify_displacement(
+                        x=mean_position[0, 0],
+                        amplification_factor=self.ws_env.mean_scale_factor,
+                    )  # x
+                    mean_scaled[0, 1] = self._amplify_displacement(
+                        x=mean_position[0, 1],
+                        amplification_factor=self.ws_env.mean_scale_factor,
+                    )  # y
+
+                    # Combine scaled spread with scaled mean position
+                    positions = spread_scaled + mean_scaled
+                else:
+                    positions = spread_scaled + mean_scaled
 
                 # Store segment data
                 self.data["segments"][f"segment_{segment_index}"] = {
@@ -437,16 +478,18 @@ class BeamVisualizationWrapper(Wrapper):
                 segment_index += 1
 
                 # Update the incoming beam for the next lattice segment
-                self.incoming_particle_beam = outgoing_beam
+                # self.incoming_particle_beam = outgoing_beam
 
         # Try to get the segment from the backend if available
-        if hasattr(self.env.unwrapped, "backend"):
+        if hasattr(self.env.unwrapped, "backend"):  # TODO: Generalize for other ARES
             # Get screen pixel reading
-            info = self.env.unwrapped.backend.get_info()
+            # info = self.env.unwrapped.backend.get_info()
             # img = self.env.unwrapped.backend.get_screen_image()
-            screen_reading = info["screen_image"]
+            # screen_reading = info["screen_image"]
+            pass
         else:
-            screen_reading = self.segment.AREABSCR1.reading
+            # screen_reading = self.segment.AREABSCR1.reading
+            pass
 
         self.current_step += 1
 
@@ -458,4 +501,20 @@ class BeamVisualizationWrapper(Wrapper):
             }
         )
 
-        # self.render()
+    def _amplify_displacement(
+        self, x: torch.Tensor, amplification_factor: float = 10.0, power: float = 0.75
+    ) -> torch.Tensor:
+        """
+        Apply non-linear amplification to a displacement value to enhance small changes.
+
+        Args:
+            x (torch.Tensor): The input displacement value (in meters).
+            amplification_factor (float): The factor by which to amplify
+                small displacements (e.g., 10 or 100).
+            power (float): The power exponent for non-linear amplification
+                (0 < power < 1 for amplification of small values).
+
+        Returns:
+            torch.Tensor: The amplified displacement value.
+        """
+        return torch.sign(x) * amplification_factor * torch.abs(x).pow(power)

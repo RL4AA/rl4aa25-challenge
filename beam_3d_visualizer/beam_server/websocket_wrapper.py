@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_WS_HOST = "localhost"
 DEFAULT_WS_PORT = 8081
 DEFAULT_CONNECTION_TIMEOUT = 1.0
-
+DEFAULT_SPREAD_SCALE_FACTOR = 15
+DEFAULT_MEAN_SCALE_FACTOR = 10
 
 class WebSocketWrapper(gym.Wrapper):
     """
@@ -33,6 +34,8 @@ class WebSocketWrapper(gym.Wrapper):
         ws_host: str = DEFAULT_WS_HOST,
         ws_port: int = DEFAULT_WS_PORT,
         connection_timeout: float = DEFAULT_CONNECTION_TIMEOUT,
+        spread_scale_factor: float = DEFAULT_SPREAD_SCALE_FACTOR,
+        mean_scale_factor: float = DEFAULT_MEAN_SCALE_FACTOR,
     ):
         """
         Initialize the WebSocketWrapper.
@@ -42,6 +45,12 @@ class WebSocketWrapper(gym.Wrapper):
             ws_host (str): WebSocket server hostname.
             ws_port (int): WebSocket server port.
             connection_timeout (float): Timeout for WebSocket connections in seconds.
+            spread_scale_factor (float): A scaling factor applied to the spread
+                of particles in the beam. This factor is used to adjust
+                the particle distribution's spread across the simulation space.
+            mean_scale_factor (float): A scaling factor applied to the mean position
+                of the particles in the beam. This factor controls the central tendency
+                or the average position of the particle distribution.
         """
         super().__init__(env)
 
@@ -63,9 +72,10 @@ class WebSocketWrapper(gym.Wrapper):
 
         # Data to be transmitted to the JavaScript web application
         self.data = None
+        self.spread_scale_factor = spread_scale_factor
+        self.mean_scale_factor = mean_scale_factor
 
         self._control_action = np.zeros(5, dtype=np.float32)  # "no-op" action
-        self.last_action = None  # Not used here, but included for completeness
 
         # Start the WebSocket server in a separate thread
         self._lock = threading.Lock()
@@ -119,6 +129,10 @@ class WebSocketWrapper(gym.Wrapper):
                     if "controls" in data:
                         # Update the control parameters based on the WebSocket data
                         controls = data.get("controls", {})
+
+                        self.spread_scale_factor = controls.get("scaleBeamSpread", 0.0)
+                        self.mean_scale_factor = controls.get("scaleBeamPosition", 0.0)
+
                         areamqzm1 = controls.get("AREAMQZM1", 0.0)
                         areamqzm2 = controls.get("AREAMQZM2", 0.0)
                         areamcvm1 = controls.get("AREAMCVM1", 0.0)
