@@ -21,6 +21,7 @@ DEFAULT_CONNECTION_TIMEOUT = 1.0
 DEFAULT_SPREAD_SCALE_FACTOR = 15
 DEFAULT_MEAN_SCALE_FACTOR = 10
 
+
 class WebSocketWrapper(gym.Wrapper):
     """
     A Gym wrapper that enables WebSocket integration for communication
