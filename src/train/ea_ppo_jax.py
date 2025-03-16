@@ -2,7 +2,6 @@ from functools import partial
 
 import gymnasium as gym
 import numpy as np
-import torch.nn as nn
 from gymnasium.wrappers import (
     FlattenObservation,
     FrameStack,
@@ -11,7 +10,7 @@ from gymnasium.wrappers import (
     TimeLimit,
 )
 from rl_zoo3 import linear_schedule
-from stable_baselines3 import PPO
+from sbx import PPO
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
@@ -40,7 +39,7 @@ def main() -> None:
         "incoming_mode": "random",
         "misalignment_mode": "random",
         "max_misalignment": 5e-4,
-        "target_beam_mode": np.zeros(4),
+        "target_beam_mode": "random",
         "threshold_hold": 1,
         "clip_magnets": True,
         # Reward (also environment)
@@ -84,7 +83,7 @@ def main() -> None:
         "total_timesteps": 5_000_000,
         # Policy
         "net_arch": "small",  # Can be "small" or "medium"
-        "activation_fn": "Tanh",  # Tanh, ReLU, GELU
+        # "activation_fn": "Tanh",  # Tanh, ReLU, GELU
         "ortho_init": True,  # True, False
         "log_std_init": -2.3,
         # SB3 config
@@ -165,7 +164,7 @@ def train(config: dict) -> None:
         sde_sample_freq=config["sde_sample_freq"],
         target_kl=config["target_kl"],
         policy_kwargs={
-            "activation_fn": getattr(nn, config["activation_fn"]),
+            # "activation_fn": getattr(nn, config["activation_fn"]),
             "net_arch": {  # From rl_zoo3
                 "small": {"pi": [64, 64], "vf": [64, 64]},
                 "medium": {"pi": [256, 256], "vf": [256, 256]},
@@ -204,7 +203,7 @@ def make_env(
     log_task_statistics: bool = False,
 ) -> gym.Env:
     env = ea.TransverseTuning(
-        backend="jax",
+        backend="cheetah",
         backend_args={
             "incoming_mode": config["incoming_mode"],
             "misalignment_mode": config["misalignment_mode"],
