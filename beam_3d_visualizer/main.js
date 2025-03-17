@@ -304,7 +304,6 @@ class SceneManager {
             { id: 'particleSpeed', type: 'speed', label: 'Particle Speed', min: 0.001, max: 1.0, step: 0.001, initial: 0.1 },
             { id: 'scaleBeamSpread', type: 'speed', label: 'Scale beam width', min: 1.0, max: 100.0, step: 1.0, initial: 15.0 },
             { id: 'scaleBeamPosition', type: 'speed', label: 'Scale beam position', min: 1.0, max: 51.0, step: 1, initial: 50.0 }
-
         ];
 
         // Create each slider element
