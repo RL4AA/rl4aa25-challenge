@@ -86,7 +86,7 @@ def main() -> None:
         "net_arch": "small",  # Can be "small" or "medium"
         "activation_fn": "Tanh",  # Tanh, ReLU, GELU
         "ortho_init": True,  # True, False
-        "log_std_init": -2.3,
+        "log_std_init": 0.0,
         # SB3 config
         "sb3_device": "auto",
         "vec_env": "subproc",
@@ -204,7 +204,7 @@ def make_env(
     log_task_statistics: bool = False,
 ) -> gym.Env:
     env = ea.TransverseTuning(
-        backend="jax",
+        backend="cheetah",
         backend_args={
             "incoming_mode": config["incoming_mode"],
             "misalignment_mode": config["misalignment_mode"],
