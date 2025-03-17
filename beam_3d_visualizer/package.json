@@ -8,10 +8,10 @@
     "three": "^0.163.0"
   },
   "devDependencies": {
+    "concurrently": "^8.2.2",
     "vite": "^6.2.0",
     "vite-plugin-copy": "^0.1.6",
-    "vite-plugin-image-optimizer": "^1.1.8",
-    "concurrently": "^8.2.2"
+    "vite-plugin-image-optimizer": "^1.1.8"
   },
   "scripts": {
     "dev": "vite",
