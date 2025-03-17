@@ -67,8 +67,6 @@ class BeamVisualizationWrapper(Wrapper):
         self.http_port = http_port
         self.render_mode = render_mode
         self.num_particles = num_particles
-        self.spread_scale_factor = self.ws_env.spread_scale_factor
-        self.mean_scale_factor = self.ws_env.mean_scale_factor
         self.current_step = 0
         self.web_process = None
         self.web_thread = None
@@ -401,6 +399,8 @@ class BeamVisualizationWrapper(Wrapper):
         references = [self.incoming_particle_beam]
         for element in self.segment.elements:
             # Track beam through this element
+            # Use the output beam of the previous segment as the input
+            # for the next lattice section
             outgoing_beam = element.track(references[-1])
             references.append(outgoing_beam)
 
@@ -477,9 +477,6 @@ class BeamVisualizationWrapper(Wrapper):
                 # Update segment index
                 segment_index += 1
 
-                # Update the incoming beam for the next lattice segment
-                # self.incoming_particle_beam = outgoing_beam
-
         # Try to get the segment from the backend if available
         if hasattr(self.env.unwrapped, "backend"):  # TODO: Generalize for other ARES
             # Get screen pixel reading
@@ -502,19 +499,17 @@ class BeamVisualizationWrapper(Wrapper):
         )
 
     def _amplify_displacement(
-        self, x: torch.Tensor, amplification_factor: float = 10.0, power: float = 0.75
+        self, x: torch.Tensor, amplification_factor: float = 50.0
     ) -> torch.Tensor:
         """
-        Apply non-linear amplification to a displacement value to enhance small changes.
+        Apply linear amplification to a displacement value to enhance small changes.
 
         Args:
             x (torch.Tensor): The input displacement value (in meters).
             amplification_factor (float): The factor by which to amplify
                 small displacements (e.g., 10 or 100).
-            power (float): The power exponent for non-linear amplification
-                (0 < power < 1 for amplification of small values).
 
         Returns:
             torch.Tensor: The amplified displacement value.
         """
-        return torch.sign(x) * amplification_factor * torch.abs(x).pow(power)
+        return torch.sign(x) * amplification_factor * torch.abs(x)
