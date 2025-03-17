@@ -186,8 +186,8 @@ class SceneManager {
     }
 
     setupTargetPoint() {
-        // Create a small red sphere to mark the controls.target
-        const targetGeometry = new THREE.SphereGeometry(0.01, 16, 16); // Default radius: 0.01 (small red sphere)
+        // Create a small red rectangle (box) to mark the controls.target
+        const targetGeometry = new THREE.BoxGeometry(0.004, 0.002, 0.003); // Width: 4 mm, Height: 2 mm, Depth: 3 mm
         const targetMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000,   // Red color
             transparent: true, // Enable transparency
@@ -303,7 +303,7 @@ class SceneManager {
             { id: 'AREAMCHM1', type: 'angle', label: 'AREAMCHM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
             { id: 'particleSpeed', type: 'speed', label: 'Particle Speed', min: 0.001, max: 1.0, step: 0.001, initial: 0.1 },
             { id: 'scaleBeamSpread', type: 'speed', label: 'Scale beam width', min: 1.0, max: 100.0, step: 1.0, initial: 15.0 },
-            { id: 'scaleBeamPosition', type: 'speed', label: 'Scale beam position', min: 1.0, max: 15.0, step: 1, initial: 10.0 }
+            { id: 'scaleBeamPosition', type: 'speed', label: 'Scale beam position', min: 1.0, max: 101.0, step: 1, initial: 50.0 }
 
         ];
 
@@ -580,7 +580,7 @@ class SceneManager {
     createParticles() {
         console.log('Create particles ...');
 
-        const sphereGeometry = new THREE.SphereGeometry(0.001, 8, 8); // Default: radius=0.001, widthSegments=8, heightSegments=8
+        const sphereGeometry = new THREE.SphereGeometry(0.0001, 8, 8); // Default: radius=0.001, widthSegments=8, heightSegments=8
         const material = new THREE.MeshBasicMaterial({
             color: 0x52FF4D, // Match original beam color
             transparent: true,
