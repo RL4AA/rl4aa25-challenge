@@ -889,10 +889,16 @@ class SceneManager {
     }
 
     getWebSocketUrl() {
+        // Setup default fallback
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = 'localhost';  // Ensure Python server is accessible
-        const port = '8081'; // Match WebSocket port from env_configs.yml
-        return `${protocol}//${host}:${port}`;
+        const host = 'localhost';
+        const port = '8081';
+
+        // Use the environment variable if available, otherwise fallback to a default
+        const wsUrl = import.meta.env.VITE_PYTHON_SERVER_URL || `${protocol}//${host}:${port}`;
+        console.debug('WebSocket URL from env:', wsUrl);
+
+        return wsUrl;
     }
 
     connectWebSocket() {

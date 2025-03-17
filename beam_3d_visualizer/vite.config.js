@@ -1,5 +1,7 @@
-export default {
-  base: process.env.NODE_ENV === 'production' ? '/asdf/' : '/',
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  base: process.env.NODE_ENV === 'production' ? '/' : '/asdf/',
   publicDir: 'public', // Explicitly set to the default value
   build: {
     rollupOptions: {
@@ -21,4 +23,4 @@ export default {
     chunkSizeWarningLimit: 1500, // 1.5 MB
     minify: 'esbuild', // Faster minification
   },
-};
+});

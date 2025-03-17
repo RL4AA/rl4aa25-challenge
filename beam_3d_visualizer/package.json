@@ -1,13 +1,17 @@
 {
+  "name": "beam_3d_visualizer",
+  "type": "module",
   "dependencies": {
+    "express": "^4.18.2",
     "plotly.js-dist": "^3.0.1",
     "puppeteer": "^24.3.1",
     "three": "^0.163.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
     "vite": "^6.2.0",
-    "vite-plugin-image-optimizer": "^1.1.8"
+    "vite-plugin-copy": "^0.1.6",
+    "vite-plugin-image-optimizer": "^1.1.8",
+    "concurrently": "^8.2.2"
   },
   "scripts": {
     "dev": "vite",
