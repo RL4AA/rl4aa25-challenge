@@ -21,12 +21,7 @@ import wandb
 
 from ..environments import ea
 from ..utils import save_config
-from ..wrappers import (
-    LogTaskStatistics,
-    PlotEpisode,
-    PolishedDonkeyReward,
-    RescaleObservation,
-)
+from ..wrappers import LogTaskStatistics, PlotEpisode, RescaleObservation
 
 
 def main() -> None:
@@ -220,17 +215,6 @@ def make_env(
         target_threshold=config["target_threshold"],
         threshold_hold=config["threshold_hold"],
         clip_magnets=config["clip_magnets"],
-        beam_param_transform=config["beam_param_transform"],
-        beam_param_combiner=config["beam_param_combiner"],
-        beam_param_combiner_args=config["beam_param_combiner_args"],
-        beam_param_combiner_weights=config["beam_param_combiner_weights"],
-        magnet_change_transform=config["magnet_change_transform"],
-        magnet_change_combiner=config["magnet_change_combiner"],
-        magnet_change_combiner_args=config["magnet_change_combiner_args"],
-        magnet_change_combiner_weights=config["magnet_change_combiner_weights"],
-        final_combiner=config["final_combiner"],
-        final_combiner_args=config["final_combiner_args"],
-        final_combiner_weights=config["final_combiner_weights"],
         render_mode="rgb_array",
     )
     env = TimeLimit(env, config["max_episode_steps"])
@@ -243,12 +227,10 @@ def make_env(
         )
     if log_task_statistics:
         env = LogTaskStatistics(env)
-    if config["normalize_observation"] and not config["running_obs_norm"]:
+    if config["normalize_observation"]:
         env = RescaleObservation(env, -1, 1)
     if config["rescale_action"]:
         env = RescaleAction(env, -1, 1)
-    if config["polished_donkey_reward"]:
-        env = PolishedDonkeyReward(env)
     env = FlattenObservation(env)
     if config["frame_stack"] > 1:
         env = FrameStack(env, config["frame_stack"])

@@ -9,14 +9,7 @@ import numpy as np
 import torch
 from gymnasium import spaces
 
-from ..reward import combiners, transforms
-from ..type_aliases import CombinerLiteral, TransformLiteral
 from .base_backend import TransverseTuningBaseBackend
-
-# TODO Pass incoming as Cheetah beam
-# TODO Make sure random seeds are used correctly (incoming, misalignments, etc.)
-# TODO Add reset option to generate beam images with Cheeath environment
-# TODO Faster dummy pydoocs
 
 
 class TransverseTuning(gym.Env):
@@ -65,27 +58,6 @@ class TransverseTuning(gym.Env):
         positive values. This might make learning or optimisation easier.
     :param clip_magnets: If `True`, magnet settings are clipped to their allowed ranges
         after each step.
-    :param beam_param_transform: Reward transform for the beam parameters. Can be
-        `"Linear"`, `"ClippedLinear"`, `"SoftPlus"`, `"NegExp"` or `"Sigmoid"`.
-    :param beam_param_combiner: Reward combiner for the beam parameters. Can be
-        `"Mean"`, `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or
-        `"SmoothMax"`.
-    :param beam_param_combiner_args: Arguments for the beam parameter combiner. NOTE
-        that these may be different for different combiners.
-    :param beam_param_combiner_weights: Weights for the beam parameter combiner.
-    :param magnet_change_transform: Reward transform for the magnet changes. Can be
-        `"Linear"`, `"ClippedLinear"`, `"SoftPlus"`, `"NegExp"` or `"Sigmoid"`.
-    :param magnet_change_combiner: Reward combiner for the magnet changes. Can be
-        `"Mean"`, `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or
-        `"SmoothMax"`.
-    :param magnet_change_combiner_args: Arguments for the magnet change combiner. NOTE
-        that these may be different for different combiners.
-    :param magnet_change_combiner_weights: Weights for the magnet change combiner.
-    :param final_combiner: Reward combiner for the final reward. Can be `"Mean"`,
-        `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or `"SmoothMax"`.
-    :param final_combiner_args: Arguments for the final combiner. NOTE that these may
-        be different for different combiners.
-    :param final_combiner_weights: Weights for the final combiner.
     """
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
@@ -105,17 +77,6 @@ class TransverseTuning(gym.Env):
         threshold_hold: int = 1,
         unidirectional_quads: bool = False,
         clip_magnets: bool = True,
-        beam_param_transform: TransformLiteral = "Sigmoid",
-        beam_param_combiner: CombinerLiteral = "GeometricMean",
-        beam_param_combiner_args: dict = {},
-        beam_param_combiner_weights: list = [1, 1, 1, 1],
-        magnet_change_transform: TransformLiteral = "Sigmoid",
-        magnet_change_combiner: CombinerLiteral = "Mean",
-        magnet_change_combiner_args: dict = {},
-        magnet_change_combiner_weights: list = [1, 1, 1, 1, 1],
-        final_combiner: CombinerLiteral = "SmoothMax",
-        final_combiner_args: dict = {"alpha": -5},
-        final_combiner_weights: list = [1, 1, 0.5],
         backend_args: dict = {},
     ) -> None:
         self.action_mode = action_mode
@@ -218,26 +179,6 @@ class TransverseTuning(gym.Env):
                     dtype=np.float32,
                 ),
             )
-
-        # Setup reward computation
-        beam_param_transform_cls = getattr(transforms, beam_param_transform)
-        beam_param_combiner_cls = getattr(combiners, beam_param_combiner)
-        magnet_change_transform_cls = getattr(transforms, magnet_change_transform)
-        magnet_change_combiner_cls = getattr(combiners, magnet_change_combiner)
-        final_combiner_cls = getattr(combiners, final_combiner)
-
-        self._abs_transform = transforms.Abs()
-        self._beam_param_transform = beam_param_transform_cls(good=0.0, bad=4e-3)
-        self._beam_param_combiner = beam_param_combiner_cls(**beam_param_combiner_args)
-        self._magnet_change_transform = magnet_change_transform_cls(good=0.0, bad=1.0)
-        self._magnet_change_combiner = magnet_change_combiner_cls(
-            **magnet_change_combiner_args
-        )
-        self._final_combiner = final_combiner_cls(**final_combiner_args)
-
-        self._beam_param_combiner_weights = beam_param_combiner_weights
-        self._magnet_change_combiner_weights = magnet_change_combiner_weights
-        self._final_combiner_weights = final_combiner_weights
 
         # Setup particle simulation or control system backend
         if backend == "cheetah":
