@@ -4,9 +4,8 @@ from typing import Callable
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
-from gymnasium import logger
-
 import wandb
+from gymnasium import logger
 
 from ..eval import Episode
 
@@ -120,13 +119,11 @@ class PlotEpisode(gym.Wrapper):
         if self.is_recording:
             self._save_episode_plot()
 
-    def _save_episode_plot(self):
-        """
-        Creates a matplotlib plot of the episode and saves it to the plot directory.
-        """
+    def generate_episode_plot(self, save_path: str | None = None):
+        """Generate the episode plot."""
         if len(self.observations) < 2:  # No data to plot
             logger.warn(
-                f"Unable to save episode plot for {self.episode_id = } because the"
+                f"Unable to generate episode plot for {self.episode_id=} because the"
                 " episode was too short."
             )
             return
@@ -140,8 +137,17 @@ class PlotEpisode(gym.Wrapper):
             actions=self.actions,
         )
 
+        fig = episode.plot_summary(save_path=save_path)
+        return fig
+
+    def _save_episode_plot(self):
+        """
+        Creates a matplotlib plot of the episode and saves it to the plot directory.
+        """
+
         file_path = os.path.join(self.save_dir, f"{self.name_prefix}-{self.episode_id}")
-        fig = episode.plot_summary(save_path=file_path)
+
+        fig = self.generate_episode_plot(save_path=file_path)
 
         if self.log_to_wandb and wandb.run:
             wandb.log({"plots": fig})
