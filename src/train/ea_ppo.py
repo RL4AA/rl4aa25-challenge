@@ -201,10 +201,11 @@ def make_env(
     env = ea.TransverseTuning(
         backend="cheetah",
         backend_args={
-            "incoming_mode": config["incoming_mode"],
-            "misalignment_mode": config["misalignment_mode"],
-            "max_misalignment": config["max_misalignment"],
             "generate_screen_images": plot_episode,
+            "incoming_mode": config["incoming_mode"],
+            "max_misalignment": config["max_misalignment"],
+            "misalignment_mode": config["misalignment_mode"],
+            "simulate_finite_screen": config["simulate_finite_screen"],
         },
         action_mode=config["action_mode"],
         magnet_init_mode=config["magnet_init_mode"],

@@ -576,10 +576,18 @@ class CheetahBackend(TransverseTuningBaseBackend):
         elif self.misalignment_mode == "random":
             misalignments = self.misalignment_space.sample()
 
-        self.segment.AREAMQZM1.misalignment = torch.as_tensor(misalignments[0:2])
-        self.segment.AREAMQZM2.misalignment = torch.as_tensor(misalignments[2:4])
-        self.segment.AREAMQZM3.misalignment = torch.as_tensor(misalignments[4:6])
-        self.segment.AREABSCR1.misalignment = torch.as_tensor(misalignments[6:8])
+        self.segment.AREAMQZM1.misalignment = torch.tensor(
+            misalignments[0:2], dtype=torch.float32
+        )
+        self.segment.AREAMQZM2.misalignment = torch.tensor(
+            misalignments[2:4], dtype=torch.float32
+        )
+        self.segment.AREAMQZM3.misalignment = torch.tensor(
+            misalignments[4:6], dtype=torch.float32
+        )
+        self.segment.AREABSCR1.misalignment = torch.tensor(
+            misalignments[6:8], dtype=torch.float32
+        )
 
     def _preprocess_reset_options(self, options: dict) -> dict:
         """

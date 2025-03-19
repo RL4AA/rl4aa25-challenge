@@ -1,61 +1,51 @@
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+import numpy as np
+from gymnasium import spaces
 from gymnasium.wrappers import FlattenObservation, FrameStack, RescaleAction, TimeLimit
-from stable_baselines3 import PPO
+from stable_baselines3.common.base_class import BaseAlgorithm
 from tqdm import tqdm
 
 from src.environments import ea
 from src.trial import Trial, load_trials
-from src.utils import load_config
 from src.wrappers import RecordEpisode, RescaleObservation
 
 
-def try_problem(trial_index: int, trial: Trial, write_data: bool = True) -> None:
-    # model_name = "denim-spaceship-145"
-    # model_name = "atomic-sweep-282"
-    # model_name = "balmy-sweep-115"
-    # model_name = "colorful-sponge-28"
-    # model_name = "spring-music-454"
-    model_name = "feasible-plasma-476"
-    # model_name = "smooth-planet-477"
-
-    # Load the model
-    model = PPO.load(f"models/ea/ppo/{model_name}/model")
-    config = load_config(f"models/ea/ppo/{model_name}/config")
+def try_problem(
+    trial_index: int,
+    trial: Trial,
+    model: BaseAlgorithm,
+    config: dict,
+    write_data: bool = True,
+) -> None:
+    policy_name = config["run_name"]
 
     # Create the environment
     env = ea.TransverseTuning(
         backend="cheetah",
         backend_args={
             "incoming_mode": trial.incoming_beam,
+            "max_misalignment": 5e-4,
             "misalignment_mode": trial.misalignments,
+            "simulate_finite_screen": True,
         },
         action_mode=config["action_mode"],
         magnet_init_mode=config["magnet_init_mode"],
         max_quad_delta=config["max_quad_delta"],
         max_steerer_delta=config["max_steerer_delta"],
-        target_beam_mode=trial.target_beam,
+        target_beam_mode=np.zeros(4),
         target_threshold=None,
         threshold_hold=5,
         clip_magnets=True,
-        beam_param_transform=config["beam_param_transform"],
-        beam_param_combiner=config["beam_param_combiner"],
-        beam_param_combiner_args=config["beam_param_combiner_args"],
-        beam_param_combiner_weights=config["beam_param_combiner_weights"],
-        final_combiner=config["final_combiner"],
-        final_combiner_args=config["final_combiner_args"],
-        final_combiner_weights=config["final_combiner_weights"],
     )
     env = TimeLimit(env, 150)
     if write_data:
         env = RecordEpisode(
             env,
-            save_dir=(
-                f"data/bo_vs_rl/simulation/rl_feasible_plasma/problem_{trial_index:03d}"
-            ),
+            save_dir=(f"data/evaluate_policy/{policy_name}/problem_{trial_index:03d}"),
         )
-    if config["normalize_observation"] and not config["running_obs_norm"]:
+    if config["normalize_observation"]:
         env = RescaleObservation(env, -1, 1)
     if config["rescale_action"]:
         env = RescaleAction(env, -1, 1)
@@ -71,6 +61,79 @@ def try_problem(trial_index: int, trial: Trial, write_data: bool = True) -> None
         observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
     env.close()
+
+
+def generate_trials(num: int, seed: int | None = None) -> list[Trial]:
+    assert num > 0
+
+    if seed is not None:
+        np.random.seed(seed)
+
+    target_beam_space = spaces.Box(
+        low=np.array([-2e-3, 0, -2e-3, 0], dtype=np.float32),
+        high=np.array([2e-3, 2e-3, 2e-3, 2e-3], dtype=np.float32),
+    )
+    incoming_beam_space = spaces.Box(
+        low=np.array(
+            [
+                80e6,
+                -1e-3,
+                -1e-4,
+                -1e-3,
+                -1e-4,
+                1e-5,
+                1e-6,
+                1e-5,
+                1e-6,
+                1e-6,
+                1e-4,
+            ],
+            dtype=np.float32,
+        ),
+        high=np.array(
+            [160e6, 1e-3, 1e-4, 1e-3, 1e-4, 5e-4, 5e-5, 5e-4, 5e-5, 5e-5, 1e-3],
+            dtype=np.float32,
+        ),
+    )
+    misalignment_space = spaces.Box(low=-5e-4, high=5e-4, shape=(8,), dtype=np.float32)
+    initial_magnet_space = spaces.Box(
+        low=np.array([-30, -30, -6.1782e-3, -30, -6.1782e-3]),
+        high=np.array([30, 30, 6.1782e-3, 30, 6.1782e-3], dtype=np.float32),
+    )
+
+    trials = [
+        Trial(
+            target_beam=target_beam_space.sample(),
+            incoming_beam=incoming_beam_space.sample(),
+            misalignments=misalignment_space.sample(),
+            initial_magnets=initial_magnet_space.sample,
+        )
+        for _ in range(num)
+    ]
+
+    return trials
+
+
+def evaluate_policy(
+    model: BaseAlgorithm, config: dict, write_data: bool = True, seed: int | None = None
+) -> None:
+    trials = generate_trials(num=300, seed=seed)
+
+    for i, trial in enumerate(trials):
+        try_problem(i, trial, model, config, write_data)
+
+    # with ProcessPoolExecutor() as executor:
+    #     _ = tqdm(
+    #         executor.map(
+    #             try_problem,
+    #             range(len(trials)),
+    #             trials,
+    #             [model] * len(trials),
+    #             [config] * len(trials),
+    #             [write_data] * len(trials),
+    #         ),
+    #         total=len(trials),
+    #     )
 
 
 def main():

@@ -757,3 +757,12 @@ class Study:
                 for episode in self.episodes
             ]
         )
+
+    def median_sum_of_normalized_magnet_changes(self) -> float:
+        """
+        Return the median sum of normalized magnet changes over all episodes in the
+        study.
+        """
+        return np.median(
+            [episode.sum_of_normalized_magnet_changes() for episode in self.episodes]
+        )
