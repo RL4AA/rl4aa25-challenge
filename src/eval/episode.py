@@ -1003,7 +1003,7 @@ class Episode:
         return magnets[:, steerer_indices]
 
     def steps_to_convergence(
-        self, threshold: float = 20e-6, use_min_mae: bool = True
+        self, threshold: float = 20e-6, use_min_mae: bool = False
     ) -> int:
         """
         Find the number of steps until the MAEs converge towards some value, i.e. change
@@ -1025,7 +1025,7 @@ class Episode:
     def steps_to_threshold(
         self,
         threshold: float = 20e-6,
-        use_min_mae: bool = True,
+        use_min_mae: bool = False,
         allow_lowest_as_target: bool = False,
     ) -> int:
         """
