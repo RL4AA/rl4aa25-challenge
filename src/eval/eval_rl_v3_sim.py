@@ -61,6 +61,7 @@ def evaluate_on_trial(
         action, _ = model.predict(observation, deterministic=True)
         observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
+
     env.close()
 
 
