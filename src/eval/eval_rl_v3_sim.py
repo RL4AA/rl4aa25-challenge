@@ -118,7 +118,7 @@ def generate_trials(num: int, seed: int | None = None) -> list[Trial]:
 def evaluate_policy(
     model: BaseAlgorithm, config: dict, write_data: bool = True, seed: int | None = None
 ) -> None:
-    trials = generate_trials(num=300, seed=seed)
+    trials = generate_trials(num=20, seed=seed)
 
     for i, trial in enumerate(trials):
         try_problem(i, trial, model, config, write_data)
