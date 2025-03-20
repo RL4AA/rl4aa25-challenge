@@ -214,7 +214,7 @@ def make_env(
         max_steerer_delta=config["max_steerer_delta"],
         target_beam_mode=config["target_beam_mode"],
         target_threshold=config["target_threshold"],
-        threshold_hold=config["threshold_hold"],
+        # threshold_hold=config["threshold_hold"],
         clip_magnets=config["clip_magnets"],
         render_mode="rgb_array",
     )
