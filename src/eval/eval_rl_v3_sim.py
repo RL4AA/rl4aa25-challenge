@@ -12,7 +12,7 @@ from src.trial import Trial, load_trials
 from src.wrappers import RecordEpisode, RescaleObservation
 
 
-def try_problem(
+def evaluate_on_trial(
     trial_index: int,
     trial: Trial,
     model: BaseAlgorithm,
@@ -44,7 +44,7 @@ def try_problem(
     if write_data:
         env = RecordEpisode(
             env,
-            save_dir=(f"data/evaluate_policy/{policy_name}/problem_{trial_index:03d}"),
+            save_dir=(f"data/{policy_name}/problem_{trial_index:03d}"),
         )
     if config["normalize_observation"]:
         env = RescaleObservation(env, -1, 1)
@@ -121,27 +121,14 @@ def evaluate_policy(
     trials = generate_trials(num=20, seed=seed)
 
     for i, trial in enumerate(trials):
-        try_problem(i, trial, model, config, write_data)
-
-    # with ProcessPoolExecutor() as executor:
-    #     _ = tqdm(
-    #         executor.map(
-    #             try_problem,
-    #             range(len(trials)),
-    #             trials,
-    #             [model] * len(trials),
-    #             [config] * len(trials),
-    #             [write_data] * len(trials),
-    #         ),
-    #         total=len(trials),
-    #     )
+        evaluate_on_trial(i, trial, model, config, write_data)
 
 
 def main():
     trials = load_trials(Path("data/trials.yaml"))
 
     with ProcessPoolExecutor() as executor:
-        _ = tqdm(executor.map(try_problem, range(len(trials)), trials), total=300)
+        _ = tqdm(executor.map(evaluate_on_trial, range(len(trials)), trials), total=300)
 
 
 if __name__ == "__main__":
