@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 from gymnasium import spaces
 from gymnasium.wrappers import FlattenObservation, FrameStack, RescaleAction, TimeLimit
+from icecream import ic
 from stable_baselines3.common.base_class import BaseAlgorithm
 from tqdm import tqdm
 
@@ -28,7 +29,7 @@ def try_problem(
             "incoming_mode": trial.incoming_beam,
             "max_misalignment": 5e-4,
             "misalignment_mode": trial.misalignments,
-            "simulate_finite_screen": True,
+            "simulate_finite_screen": False,
         },
         action_mode=config["action_mode"],
         magnet_init_mode=config["magnet_init_mode"],
@@ -52,6 +53,8 @@ def try_problem(
     env = FlattenObservation(env)
     if config["frame_stack"] > 1:
         env = FrameStack(env, config["frame_stack"])
+
+    ic(env)
 
     # Actual optimisation
     observation, info = env.reset()
