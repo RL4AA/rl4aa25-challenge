@@ -786,6 +786,8 @@ class Study:
             }
         )
         Path("data/csvs").mkdir(exist_ok=True)
+        if Path(f"data/csvs/{self.name}.csv").exists():
+            print(f"Overwriting existing file data/csvs/{self.name}.csv")
         df.to_csv(f"data/csvs/{self.name}.csv", index_label="id")
 
         # Output evaluation results
