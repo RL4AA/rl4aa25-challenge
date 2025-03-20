@@ -6,6 +6,7 @@ from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scienceplots  # noqa: F401
 import seaborn as sns
 
@@ -765,4 +766,33 @@ class Study:
         """
         return np.median(
             [episode.sum_of_normalized_magnet_changes() for episode in self.episodes]
+        )
+
+    def evaluate_challenge(self) -> None:
+        """Produce a CSV file for the Kaggle challenge and output evaluation results."""
+        # Prodcue Kaggle CSV
+        final_mae = [episode.final_mae() for episode in self.episodes]
+        steps_to_convergence = [
+            episode.steps_to_convergence(4e-5) for episode in self.episodes
+        ]
+        sum_of_normalized_magnet_changes = [
+            episode.sum_of_normalized_magnet_changes() for episode in self.episodes
+        ]
+        df = pd.DataFrame(
+            {
+                "final_mae": final_mae,
+                "steps_to_convergence": steps_to_convergence,
+                "sum_of_normalized_magnet_changes": sum_of_normalized_magnet_changes,
+            }
+        )
+        Path("data/csvs").mkdir(exist_ok=True)
+        df.to_csv(f"data/csvs/{self.name}.csv", index_label="id")
+
+        # Output evaluation results
+        print(f"Final MAE: {self.median_final_mae() * 1e6:.0f} μm")
+        print(
+            f"Steps to convergence: {self.median_steps_to_convergence(threshold=4e-5)}"
+        )
+        print(
+            f"Sum of magnet changes: {self.median_sum_of_normalized_magnet_changes():.2f}"
         )
