@@ -450,7 +450,7 @@ class CheetahBackend(TransverseTuningBaseBackend):
         false false beam parameters are returned when the beam is not on the screen.
         The false beam parameters are estimates of what would be measured on the real
         screen as a result of the camera vignetting when no beam is visible. NOTE that
-        these fasle beam parameters would always be returned and therefore also be used
+        these false beam parameters would always be returned and therefore also be used
         for the reward computation.
     """
 
