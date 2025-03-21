@@ -2,3 +2,4 @@ __pycache__
 log
 plots
 wandb
+data/evaluate_policy/
