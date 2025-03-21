@@ -19,6 +19,16 @@ def evaluate_on_trial(
     config: dict,
     write_data: bool = True,
 ) -> None:
+    """
+    Evaluate a policy on a single trial.
+
+    :param trial_index: The index of the trial.
+    :param trial: The trial to evaluate on.
+    :param model: The policy model to evaluate.
+    :param config: The configuration dictionary used when training the policy.
+    :param write_data: Whether to write the episode data to disk.
+    """
+
     policy_name = config["run_name"]
 
     # Create the environment
@@ -66,6 +76,16 @@ def evaluate_on_trial(
 
 
 def generate_trials(num: int, seed: int | None = None) -> list[Trial]:
+    """
+    Generate a set of random trials for evaluation. Each trial consists of a
+    random incoming beam, target beam, quadrupole misalignment and screen
+    misalignment.
+
+    :param num: The number of trials to generate.
+    :param seed: The seed to use for generating the trials.
+    :return: A list of trials.
+    """
+
     assert num > 0
 
     if seed is not None:
@@ -119,6 +139,16 @@ def generate_trials(num: int, seed: int | None = None) -> list[Trial]:
 def evaluate_policy(
     model: BaseAlgorithm, config: dict, write_data: bool = True, seed: int | None = None
 ) -> None:
+    """
+    Evaluate a policy on a set of trials (different incoming beams, quadrupole
+    misalignments and screen misalignments).
+
+    :param model: The policy model to evaluate.
+    :param config: The configuration dictionary used when training the policy.
+    :param write_data: Whether to write the episode data to disk.
+    :param seed: The seed to use for generating the trials.
+    """
+
     trials = generate_trials(num=20, seed=seed)
 
     for i, trial in enumerate(trials):
