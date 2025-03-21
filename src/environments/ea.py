@@ -336,6 +336,27 @@ class TransverseTuning(gym.Env):
         )
 
     def _get_reward(self) -> float:
+        """
+        vvvvvvvvvvv YOU MAY MODIFY THIS METHOD TO IMPLEMENT YOUR OWN REWARD. vvvvvvvvvvv
+
+        Computes the reward for the current step.
+
+        You can make use of the following information to compute the reward:
+         - self.backend.get_beam_parameters(): Returns a NumPy array with the current
+              beam parameters (mu_x, sigma_x, mu_y, sigma_y).
+            - self._target_beam: NumPy array with the target beam parameters (mu_x,
+                sigma_x, mu_y, sigma_y).
+            - self.backend.is_beam_on_screen(): Boolean indicating whether the beam is
+                on the screen.
+            - self.backend.get_magnets(): NumPy array with the current magnet settings
+                as (k1_Q1, k1_Q2, angle_CV, k1_Q3, angle_CH).
+            - self._previous_magnet_settings: NumPy array with the magnet settings
+                before the current action was taken as (k1_Q1, k1_Q2, angle_CV, k1_Q3,
+                angle_CH).
+
+        You are allowed to make use of any other information available in the
+        environment and backend, if you are so inclined to look through the code.
+        """
 
         reward = 1.0  # Default reward
 
