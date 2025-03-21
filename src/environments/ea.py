@@ -341,33 +341,6 @@ class TransverseTuning(gym.Env):
 
         reward = -np.sum(np.abs(current_beam - target_beam))
 
-        # normalized_current_beam = current_beam / 2e-3
-        # normalized_target_beam = target_beam / 2e-3
-
-        # reward = -np.mean(np.abs(normalized_current_beam - normalized _target_beam))
-
-        # beam_reward = -np.mean(
-        #     np.clip(np.abs(normalized_current_beam - normalized_target_beam), 0, 1)
-        # )
-
-        # magnet_changes = self.backend.get_magnets() - self._previous_magnet_settings
-        # normalized_magnet_changes = magnet_changes / np.array(
-        #     [30, 30, 6.1782e-3, 30, 6.1782e-3]
-        # )
-        # change_reward = -np.mean(np.clip(np.abs(normalized_magnet_changes), 0, 1))
-
-        # magnet_settings = self.backend.get_magnets()
-        # normalized_magnet_settings = magnet_settings / np.array(
-        #     [30, 30, 6.1782e-3, 30, 6.1782e-3]
-        # )
-        # setting_reward = -np.mean(np.clip(np.abs(normalized_magnet_settings), 0, 1))
-
-        # q3_reward = -np.clip(np.abs(normalized_magnet_settings[3]), 0, 1)
-
-        # reward = (3.0 * beam_reward + 0.5 * change_reward + 0.5 * setting_reward) / (
-        #     3.0 + 0.5 + 0.5
-        # )
-
         return reward
 
     def render(self):
