@@ -1,4 +1,4 @@
-name: rl4aa25-tutorial
+name: rl4aa25-challenge
 channels:
   - conda-forge
 dependencies:
