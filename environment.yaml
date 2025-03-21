@@ -1,0 +1,8 @@
+name: rl4aa25-tutorial
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.12.9
+  - pip>=25.0.1
+  - pip:
+      - r requirements.txt
