@@ -4,5 +4,6 @@ channels:
 dependencies:
   - python>=3.12.9
   - pip>=25.0.1
+  - nodejs
   - pip:
       - -r requirements.txt

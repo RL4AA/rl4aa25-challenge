@@ -9,9 +9,9 @@ from typing import Any, Dict, Optional, Tuple
 import gymnasium as gym
 import numpy as np
 import torch
-from cheetah.utils.segment_3d_builder import Segment3DBuilder
 from gymnasium import Wrapper
 
+from beam_3d_visualizer.beam_server.segment_3d_builder import Segment3DBuilder
 from beam_3d_visualizer.beam_server.websocket_wrapper import WebSocketWrapper
 
 # Configure logging
