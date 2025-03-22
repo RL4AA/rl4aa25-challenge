@@ -17,7 +17,6 @@ import argparse
 import logging
 import math
 import os
-from importlib.resources import files
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, cast
 
@@ -294,7 +293,7 @@ class Segment3DBuilder:
 
         try:
             # Use importlib.resources to access the asset file.
-            asset_path = files(_assets) / asset_filename
+            asset_path = self.assets_dir / asset_filename
 
             # Force loading 3D model as a scene to ensure multiple geometries are
             # handled properly. Additioanlly, try to coerce everything into a scene
