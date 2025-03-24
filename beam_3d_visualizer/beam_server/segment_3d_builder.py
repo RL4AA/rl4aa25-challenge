@@ -22,16 +22,8 @@ from typing import Any, Dict, List, Optional, Union, cast
 
 import torch
 import trimesh
-from cheetah import (
-    Cavity,
-    Dipole,
-    HorizontalCorrector,
-    Quadrupole,
-    Screen,
-    Segment,
-    Undulator,
-    VerticalCorrector,
-)
+from cheetah import (Cavity, Dipole, HorizontalCorrector, Quadrupole, Screen,
+                     Segment, Undulator, VerticalCorrector)
 from trimesh import Scene, Trimesh
 
 # Set logging level based on environment

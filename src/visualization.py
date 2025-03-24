@@ -7,9 +7,8 @@ import ipywidgets as widgets
 import matplotlib.pyplot as plt
 from IPython.display import display
 
-from beam_3d_visualizer.beam_server.beam_visualization_wrapper import (
-    BeamVisualizationWrapper,
-)
+from beam_3d_visualizer.beam_server.beam_visualization_wrapper import \
+    BeamVisualizationWrapper
 from src.environments import ea
 
 
