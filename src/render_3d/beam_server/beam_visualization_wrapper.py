@@ -13,8 +13,8 @@ import torch
 from dotenv import load_dotenv
 from gymnasium import Wrapper
 
-from beam_3d_visualizer.beam_server.segment_3d_builder import Segment3DBuilder
-from beam_3d_visualizer.beam_server.websocket_wrapper import WebSocketWrapper
+from src.render_3d.beam_server.segment_3d_builder import Segment3DBuilder
+from src.render_3d.beam_server.websocket_wrapper import WebSocketWrapper
 
 # Calculate the path to the .env file, one levels up from the script's location
 script_dir = Path(__file__).resolve().parent  # Directory of the current script
@@ -402,7 +402,8 @@ class BeamVisualizationWrapper(Wrapper):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    env=os.environ.copy(),  # Pass environment variables (e.g., PORT from .env)
+                    # Pass environment variables (e.g., PORT from .env)
+                    env=os.environ.copy(),
                 )
 
                 # Log output for debugging
