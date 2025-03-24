@@ -890,12 +890,13 @@ class SceneManager {
     getWebSocketUrl() {
         // Setup default fallback
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = 'localhost';
-        const port = '8081';
+
+        const host = import.meta.env.VITE_PROXY_HOST_NAME || '0.0.0.0';
+        const port = import.meta.env.VITE_BACKEND_PORT || '8081';
 
         // Use the environment variable if available, otherwise fallback to a default
-        const wsUrl = import.meta.env.VITE_PYTHON_SERVER_URL || `${protocol}//${host}:${port}`;
-        console.debug('WebSocket URL from env:', wsUrl);
+        const wsUrl = import.meta.env.VITE_BACKEND_SERVER_URL || `${protocol}//${host}:${port}`;
+        console.log('WebSocket URL from env:', wsUrl); // Debug the value
 
         return wsUrl;
     }
