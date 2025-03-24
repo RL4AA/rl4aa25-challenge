@@ -356,19 +356,19 @@ class BeamVisualizationWrapper(Wrapper):
             try:
                 # Determine the mode and load the appropriate .env file
                 node_env = os.getenv(
-                    "NODE_ENV", "development"
+                    "NODE_ENV", "production"
                 )  # Default to development
-                if node_env != "production":
-                    os.environ["NODE_ENV"] = "production"
-                    node_env = os.getenv("NODE_ENV")
+                if node_env == "production":
                     env_file = script_dir.parent / ".env.production"
+                      # Load with override existing vars to ensure latest values
                     load_dotenv(
-                        dotenv_path=env_file, override=True
-                    )  # Load with override existing vars to ensure latest values
+                        dotenv_path=env_file, 
+                        override=True,
+                    )
 
                 logger.info(f"Running in mode: {node_env}")
 
-                if node_env != "production":
+                if node_env == "development":
                     # Development mode: Start Vite dev server
                     # Start Vite development server
                     cmd = [
