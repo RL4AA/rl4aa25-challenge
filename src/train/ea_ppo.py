@@ -110,9 +110,7 @@ def train(config: dict) -> None:
         )
     elif config["vec_env"] == "subproc":
         vec_env = SubprocVecEnv(
-            [
-                partial(make_env, config) for _ in range(config["n_envs"])
-            ],  # TODO: Might need to be "fork" for Maxwell to terminate properly
+            [partial(make_env, config) for _ in range(config["n_envs"])]
         )
     else:
         raise ValueError(f"Invalid value \"{config['vec_env']}\" for dummy")

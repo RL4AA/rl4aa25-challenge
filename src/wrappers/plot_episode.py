@@ -4,13 +4,11 @@ from typing import Callable
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
-import wandb
 from gymnasium import logger
 
-from ..eval import Episode
+import wandb
 
-# TODO Make record episode, plot episode and area ea elog wrapper based on one wrapper
-#     base class.
+from ..eval import Episode
 
 
 def capped_cubic_video_schedule(episode_id: int) -> bool:

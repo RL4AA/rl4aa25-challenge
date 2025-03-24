@@ -112,7 +112,6 @@ class TransverseTuning(gym.Env):
                 ),
             )
         else:
-            # TODO Have max_quad_setting but don't limit to it
             self._magnet_space = spaces.Box(
                 low=np.array(
                     [
@@ -234,7 +233,7 @@ class TransverseTuning(gym.Env):
         return observation, info
 
     def step(self, action):
-        self._take_action(action)  # TODO Clip magnets settings
+        self._take_action(action)
 
         self.backend.update()  # Run the simulation
 

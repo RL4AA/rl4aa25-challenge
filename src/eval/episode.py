@@ -26,8 +26,6 @@ plt.style.use(["science", "nature", "no-latex"])
 class Episode:
     """An episode of an ARES EA optimisation."""
 
-    # TODO Should also work when no screen images are saved
-
     def __init__(
         self,
         observations: list[Union[dict, np.ndarray]],
@@ -441,11 +439,7 @@ class Episode:
         ax: Optional[matplotlib.axes.Axes] = None,
         save_path: Optional[str] = None,
     ) -> None:
-        """
-        Plot magnet values over episdoe.
-
-        TODO Can be made from plot_quadrupoles and plot_steerers.
-        """
+        """Plot magnet values over episdoe."""
         magnets = self.magnet_history()
 
         palette_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
@@ -762,7 +756,6 @@ class Episode:
         save_path: Optional[str] = None,
     ) -> matplotlib.figure.Figure:
         """Summary plot of important data about this episode."""
-        # TODO Add ability to plot even when no screen images were saved with Cheetah
 
         if show_domain_randomisation_and_rewards:
             figsize = (figsize[0], figsize[1] * 1.5)
