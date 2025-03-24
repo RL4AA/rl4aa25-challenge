@@ -9,6 +9,7 @@ scipy
 seaborn
 stable-baselines3
 tensorboard
+trimesh
 tqdm
 wandb
-websocket
+websockets
