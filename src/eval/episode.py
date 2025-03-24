@@ -1003,7 +1003,7 @@ class Episode:
         return magnets[:, steerer_indices]
 
     def steps_to_convergence(
-        self, threshold: float = 20e-6, use_min_mae: bool = True
+        self, threshold: float = 20e-6, use_min_mae: bool = False
     ) -> int:
         """
         Find the number of steps until the MAEs converge towards some value, i.e. change
@@ -1025,7 +1025,7 @@ class Episode:
     def steps_to_threshold(
         self,
         threshold: float = 20e-6,
-        use_min_mae: bool = True,
+        use_min_mae: bool = False,
         allow_lowest_as_target: bool = False,
     ) -> int:
         """
@@ -1513,3 +1513,12 @@ class Episode:
                     "AREAMQZM3",
                     "AREAMCHM1",
                 ]
+
+    def sum_of_normalized_magnet_changes(self) -> float:
+        """
+        Compute the sum of the normalized changes in magnet settings over the episode.
+        """
+        magnets = self.magnet_history()
+        normalized_magnets = magnets / np.array([30, 30, 6.1782e-3, 30, 6.1782e-3])
+        changes = np.abs(np.diff(normalized_magnets, axis=0))
+        return np.sum(changes)

@@ -1,4 +1,4 @@
-cheetah-accelerator
+cheetah-accelerator==0.7.1
 gymnasium==0.29.1   # Fixed for now to prevent subprocess crashing
 jupyter
 matplotlib

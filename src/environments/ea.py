@@ -3,20 +3,11 @@ from typing import Literal, Optional, Union
 
 import cv2
 import gymnasium as gym
-import jax
-import jax.numpy as jnp
 import numpy as np
 import torch
 from gymnasium import spaces
 
-from ..reward import combiners, transforms
-from ..type_aliases import CombinerLiteral, TransformLiteral
 from .base_backend import TransverseTuningBaseBackend
-
-# TODO Pass incoming as Cheetah beam
-# TODO Make sure random seeds are used correctly (incoming, misalignments, etc.)
-# TODO Add reset option to generate beam images with Cheeath environment
-# TODO Faster dummy pydoocs
 
 
 class TransverseTuning(gym.Env):
@@ -65,27 +56,6 @@ class TransverseTuning(gym.Env):
         positive values. This might make learning or optimisation easier.
     :param clip_magnets: If `True`, magnet settings are clipped to their allowed ranges
         after each step.
-    :param beam_param_transform: Reward transform for the beam parameters. Can be
-        `"Linear"`, `"ClippedLinear"`, `"SoftPlus"`, `"NegExp"` or `"Sigmoid"`.
-    :param beam_param_combiner: Reward combiner for the beam parameters. Can be
-        `"Mean"`, `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or
-        `"SmoothMax"`.
-    :param beam_param_combiner_args: Arguments for the beam parameter combiner. NOTE
-        that these may be different for different combiners.
-    :param beam_param_combiner_weights: Weights for the beam parameter combiner.
-    :param magnet_change_transform: Reward transform for the magnet changes. Can be
-        `"Linear"`, `"ClippedLinear"`, `"SoftPlus"`, `"NegExp"` or `"Sigmoid"`.
-    :param magnet_change_combiner: Reward combiner for the magnet changes. Can be
-        `"Mean"`, `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or
-        `"SmoothMax"`.
-    :param magnet_change_combiner_args: Arguments for the magnet change combiner. NOTE
-        that these may be different for different combiners.
-    :param magnet_change_combiner_weights: Weights for the magnet change combiner.
-    :param final_combiner: Reward combiner for the final reward. Can be `"Mean"`,
-        `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or `"SmoothMax"`.
-    :param final_combiner_args: Arguments for the final combiner. NOTE that these may
-        be different for different combiners.
-    :param final_combiner_weights: Weights for the final combiner.
     """
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
@@ -105,17 +75,6 @@ class TransverseTuning(gym.Env):
         threshold_hold: int = 1,
         unidirectional_quads: bool = False,
         clip_magnets: bool = True,
-        beam_param_transform: TransformLiteral = "Sigmoid",
-        beam_param_combiner: CombinerLiteral = "GeometricMean",
-        beam_param_combiner_args: dict = {},
-        beam_param_combiner_weights: list = [1, 1, 1, 1],
-        magnet_change_transform: TransformLiteral = "Sigmoid",
-        magnet_change_combiner: CombinerLiteral = "Mean",
-        magnet_change_combiner_args: dict = {},
-        magnet_change_combiner_weights: list = [1, 1, 1, 1, 1],
-        final_combiner: CombinerLiteral = "SmoothMax",
-        final_combiner_args: dict = {"alpha": -5},
-        final_combiner_weights: list = [1, 1, 0.5],
         backend_args: dict = {},
     ) -> None:
         self.action_mode = action_mode
@@ -219,31 +178,9 @@ class TransverseTuning(gym.Env):
                 ),
             )
 
-        # Setup reward computation
-        beam_param_transform_cls = getattr(transforms, beam_param_transform)
-        beam_param_combiner_cls = getattr(combiners, beam_param_combiner)
-        magnet_change_transform_cls = getattr(transforms, magnet_change_transform)
-        magnet_change_combiner_cls = getattr(combiners, magnet_change_combiner)
-        final_combiner_cls = getattr(combiners, final_combiner)
-
-        self._abs_transform = transforms.Abs()
-        self._beam_param_transform = beam_param_transform_cls(good=0.0, bad=4e-3)
-        self._beam_param_combiner = beam_param_combiner_cls(**beam_param_combiner_args)
-        self._magnet_change_transform = magnet_change_transform_cls(good=0.0, bad=1.0)
-        self._magnet_change_combiner = magnet_change_combiner_cls(
-            **magnet_change_combiner_args
-        )
-        self._final_combiner = final_combiner_cls(**final_combiner_args)
-
-        self._beam_param_combiner_weights = beam_param_combiner_weights
-        self._magnet_change_combiner_weights = magnet_change_combiner_weights
-        self._final_combiner_weights = final_combiner_weights
-
         # Setup particle simulation or control system backend
         if backend == "cheetah":
             self.backend = CheetahBackend(**backend_args)
-        elif backend == "jax":
-            self.backend = JAXBackend(**backend_args)
         else:
             raise ValueError(f'Invalid value "{backend}" for backend')
 
@@ -399,37 +336,29 @@ class TransverseTuning(gym.Env):
         )
 
     def _get_reward(self) -> float:
-        current_beam = self.backend.get_beam_parameters()
-        target_beam = self._target_beam
+        """
+        vvvvvvvvvvv YOU MAY MODIFY THIS METHOD TO IMPLEMENT YOUR OWN REWARD. vvvvvvvvvvv
 
-        reward = -np.sum(np.abs(current_beam - target_beam))
+        Computes the reward for the current step.
 
-        # normalized_current_beam = current_beam / 2e-3
-        # normalized_target_beam = target_beam / 2e-3
+        You can make use of the following information to compute the reward:
+         - self.backend.get_beam_parameters(): Returns a NumPy array with the current
+              beam parameters (mu_x, sigma_x, mu_y, sigma_y).
+            - self._target_beam: NumPy array with the target beam parameters (mu_x,
+                sigma_x, mu_y, sigma_y).
+            - self.backend.is_beam_on_screen(): Boolean indicating whether the beam is
+                on the screen.
+            - self.backend.get_magnets(): NumPy array with the current magnet settings
+                as (k1_Q1, k1_Q2, angle_CV, k1_Q3, angle_CH).
+            - self._previous_magnet_settings: NumPy array with the magnet settings
+                before the current action was taken as (k1_Q1, k1_Q2, angle_CV, k1_Q3,
+                angle_CH).
 
-        # reward = -np.mean(np.abs(normalized_current_beam - normalized _target_beam))
+        You are allowed to make use of any other information available in the
+        environment and backend, if you are so inclined to look through the code.
+        """
 
-        # beam_reward = -np.mean(
-        #     np.clip(np.abs(normalized_current_beam - normalized_target_beam), 0, 1)
-        # )
-
-        # magnet_changes = self.backend.get_magnets() - self._previous_magnet_settings
-        # normalized_magnet_changes = magnet_changes / np.array(
-        #     [30, 30, 6.1782e-3, 30, 6.1782e-3]
-        # )
-        # change_reward = -np.mean(np.clip(np.abs(normalized_magnet_changes), 0, 1))
-
-        # magnet_settings = self.backend.get_magnets()
-        # normalized_magnet_settings = magnet_settings / np.array(
-        #     [30, 30, 6.1782e-3, 30, 6.1782e-3]
-        # )
-        # setting_reward = -np.mean(np.clip(np.abs(normalized_magnet_settings), 0, 1))
-
-        # q3_reward = -np.clip(np.abs(normalized_magnet_settings[3]), 0, 1)
-
-        # reward = (3.0 * beam_reward + 0.5 * change_reward + 0.5 * setting_reward) / (
-        #     3.0 + 0.5 + 0.5
-        # )
+        reward = 1.0  # Default reward
 
         return reward
 
@@ -513,7 +442,7 @@ class CheetahBackend(TransverseTuningBaseBackend):
         false false beam parameters are returned when the beam is not on the screen.
         The false beam parameters are estimates of what would be measured on the real
         screen as a result of the camera vignetting when no beam is visible. NOTE that
-        these fasle beam parameters would always be returned and therefore also be used
+        these false beam parameters would always be returned and therefore also be used
         for the reward computation.
     """
 
@@ -639,10 +568,18 @@ class CheetahBackend(TransverseTuningBaseBackend):
         elif self.misalignment_mode == "random":
             misalignments = self.misalignment_space.sample()
 
-        self.segment.AREAMQZM1.misalignment = torch.as_tensor(misalignments[0:2])
-        self.segment.AREAMQZM2.misalignment = torch.as_tensor(misalignments[2:4])
-        self.segment.AREAMQZM3.misalignment = torch.as_tensor(misalignments[4:6])
-        self.segment.AREABSCR1.misalignment = torch.as_tensor(misalignments[6:8])
+        self.segment.AREAMQZM1.misalignment = torch.tensor(
+            misalignments[0:2], dtype=torch.float32
+        )
+        self.segment.AREAMQZM2.misalignment = torch.tensor(
+            misalignments[2:4], dtype=torch.float32
+        )
+        self.segment.AREAMQZM3.misalignment = torch.tensor(
+            misalignments[4:6], dtype=torch.float32
+        )
+        self.segment.AREABSCR1.misalignment = torch.tensor(
+            misalignments[6:8], dtype=torch.float32
+        )
 
     def _preprocess_reset_options(self, options: dict) -> dict:
         """
@@ -726,420 +663,3 @@ class CheetahBackend(TransverseTuningBaseBackend):
             info["screen_image"] = self.get_screen_image()
 
         return info
-
-
-class JAXBackend(TransverseTuningBaseBackend):
-    """
-    Cheetah simulation backend to the ARES Experimental Area.
-
-    :param incoming_mode: Setting for incoming beam parameters on reset. Can be
-        `"random"` to generate random parameters or an array of 11 values to set them to
-        a constant value.
-    :param max_misalignment: Maximum misalignment of magnets and the diagnostic screen
-        in meters when `misalignment_mode` is set to `"random"`. This parameter is
-        ignored when `misalignment_mode` is set to a constant value.
-    :param misalignment_mode: Setting for misalignment of magnets and the diagnostic
-        screen on reset. Can be `"random"` to generate random misalignments or an array
-        of 8 values to set them to a constant value.
-    :param generate_screen_images: If `True`, screen images are generated in every step
-        and recorded in the backend info. NOTE that this is very slow and requires a
-        lot of memory. It should hence only be used when the images are actually
-        needed.
-    :param simulate_finite_screen: If `True`, the screen is assumed to be finite and
-        false false beam parameters are returned when the beam is not on the screen.
-        The false beam parameters are estimates of what would be measured on the real
-        screen as a result of the camera vignetting when no beam is visible. NOTE that
-        these fasle beam parameters would always be returned and therefore also be used
-        for the reward computation.
-    """
-
-    def __init__(
-        self,
-        incoming_mode: Union[Literal["random"], np.ndarray, list] = "random",
-        max_misalignment: float = 5e-4,
-        misalignment_mode: Union[Literal["random"], np.ndarray, list] = "random",
-        generate_screen_images: bool = False,
-        simulate_finite_screen: bool = False,
-    ) -> None:
-        # Dynamic import for module only required by this backend
-        # ...
-
-        self._magnet_settings = jnp.array([0.0, 0.0, 0.0, 0.0, 0.0])
-
-        if isinstance(incoming_mode, list):
-            incoming_mode = np.array(incoming_mode)
-        if isinstance(misalignment_mode, list):
-            misalignment_mode = np.array(misalignment_mode)
-
-        assert isinstance(incoming_mode, (str, np.ndarray))
-        assert isinstance(misalignment_mode, (str, np.ndarray))
-        if isinstance(misalignment_mode, np.ndarray):
-            assert misalignment_mode.shape == (8,)
-
-        self.incoming_mode = incoming_mode
-        self.max_misalignment = max_misalignment
-        self.misalignment_mode = misalignment_mode
-        self.generate_screen_images = generate_screen_images
-        self.simulate_finite_screen = simulate_finite_screen
-
-        # Spaces for domain randomisation
-        self.incoming_beam_space = spaces.Box(
-            low=np.array(
-                [
-                    80e6,
-                    -1e-3,
-                    -1e-4,
-                    -1e-3,
-                    -1e-4,
-                    1e-5,
-                    1e-6,
-                    1e-5,
-                    1e-6,
-                    1e-6,
-                    1e-4,
-                ],
-                dtype=np.float32,
-            ),
-            high=np.array(
-                [160e6, 1e-3, 1e-4, 1e-3, 1e-4, 5e-4, 5e-5, 5e-4, 5e-5, 5e-5, 1e-3],
-                dtype=np.float32,
-            ),
-        )
-
-        self.misalignment_space = spaces.Box(
-            low=-self.max_misalignment, high=self.max_misalignment, shape=(8,)
-        )
-
-    def is_beam_on_screen(self) -> bool:
-        # beam_parameters = self.get_beam_parameters()
-        # beam_position = beam_parameters[[0, 2]]
-        # limits = self.get_screen_resolution() / 2 * self.get_pixel_size()
-        # return np.all(np.abs(beam_position) < limits)
-        return True
-
-    def get_magnets(self) -> np.ndarray:
-        return np.array(self._magnet_settings)
-
-    def set_magnets(self, values: Union[np.ndarray, list]) -> None:
-        self._magnet_settings = np.array(values)
-
-    def reset(self, options=None) -> None:
-        preprocessed_options = self._preprocess_reset_options(options)
-
-        # Set up incoming beam
-        if "incoming" in preprocessed_options:
-            incoming_parameters = preprocessed_options["incoming"]
-        elif isinstance(self.incoming_mode, np.ndarray):
-            incoming_parameters = self.incoming_mode
-        elif self.incoming_mode == "random":
-            incoming_parameters = self.incoming_beam_space.sample()
-
-        self.incoming_parameters = incoming_parameters
-
-        self.incoming_energy = incoming_parameters[0]
-        self.incoming_mu = np.array(
-            [
-                incoming_parameters[1],
-                incoming_parameters[2],
-                incoming_parameters[3],
-                incoming_parameters[4],
-                0.0,
-                0.0,
-                1.0,
-            ]
-        )
-        self.incoming_cov = np.diag(
-            [
-                incoming_parameters[5] ** 2,
-                incoming_parameters[6] ** 2,
-                incoming_parameters[7] ** 2,
-                incoming_parameters[8] ** 2,
-                0.0,
-                0.0,
-                0.0,
-            ]
-        )
-
-        # Set up misalignments
-        if "misalignments" in preprocessed_options:
-            misalignments = preprocessed_options["misalignments"]
-        elif isinstance(self.misalignment_mode, np.ndarray):
-            misalignments = self.misalignment_mode
-        elif self.misalignment_mode == "random":
-            misalignments = self.misalignment_space.sample()
-
-        self.misalignments = misalignments
-
-    def _preprocess_reset_options(self, options: dict) -> dict:
-        """
-        Check that only valid options are passed and make it a dict if None was passed.
-        """
-        if options is None:
-            return {}
-
-        valid_options = ["incoming", "misalignments"]
-        for option in options:
-            assert option in valid_options
-
-        return options
-
-    def update(self) -> None:
-        self.outgoing_beam_parameters = track(
-            self._magnet_settings,
-            self.incoming_mu,
-            self.incoming_cov,
-            self.incoming_energy,
-            self.get_misalignments(),
-        )
-
-    def get_beam_parameters(self) -> np.ndarray:
-        if self.simulate_finite_screen and not self.is_beam_on_screen():
-            return np.array([0, 3.5, 0, 2.2])  # Estimates from real bo_sim data
-        else:
-            read_beam = self.outgoing_beam_parameters
-            return np.array(read_beam)
-
-    def get_incoming_parameters(self) -> np.ndarray:
-        # Parameters of incoming are typed out to guarantee their order, as the
-        # order would not be guaranteed creating np.array from dict.
-        return self.incoming_parameters
-
-    def get_misalignments(self) -> np.ndarray:
-        return self.misalignments
-
-    def get_screen_image(self) -> np.ndarray:
-        # Screen image to look like real image by dividing by goodlooking number and
-        # scaling to 12 bits)
-        return np.zeros((100, 100))
-
-    def get_binning(self) -> np.ndarray:
-        return 1
-
-    def get_screen_resolution(self) -> np.ndarray:
-        return np.array([100, 100])
-
-    def get_pixel_size(self) -> np.ndarray:
-        return np.array([1e-3, 1e-3])
-
-    def get_info(self) -> dict:
-        info = {
-            "incoming_beam": self.get_incoming_parameters(),
-            "misalignments": self.get_misalignments(),
-        }
-        if self.generate_screen_images:
-            info["screen_image"] = self.get_screen_image()
-
-        return info
-
-
-@jax.jit
-def track(
-    magnet_settings: np.ndarray,
-    incoming_mu: np.ndarray,
-    incoming_cov: np.ndarray,
-    incoming_energy: float,
-    misalignments: np.ndarray,
-) -> jnp.ndarray:
-    tm = full_rmatrix_jax(magnet_settings, incoming_energy, misalignments)
-
-    outgoing_mu = jnp.matmul(tm, incoming_mu[..., None])[..., 0]
-    outgoing_cov = jnp.matmul(tm, jnp.matmul(incoming_cov, tm.T))
-
-    outgoing_mu.at[0].set(outgoing_mu[0] - misalignments[6])
-    outgoing_mu.at[2].set(outgoing_mu[2] - misalignments[7])
-
-    return jnp.array(
-        [
-            outgoing_mu[0],
-            jnp.sqrt(outgoing_cov[0, 0]),
-            outgoing_mu[2],
-            jnp.sqrt(outgoing_cov[2, 2]),
-        ]
-    )
-
-
-def full_rmatrix_jax(
-    magnet_settings: np.ndarray, incoming_energy: float, misalignments: np.ndarray
-) -> jnp.ndarray:
-    _, igamma2, beta = compute_relativistic_factors_jax(incoming_energy, 510998.9375)
-
-    d_q1_tm = base_rmatrix_jax(
-        length=0.17504, k1=0.0, hx=0.0, species_mass_eV=510998.9375
-    )
-    q1_tm_main = base_rmatrix_jax(
-        length=0.122,
-        k1=magnet_settings[0],
-        hx=0.0,
-        species_mass_eV=510998.9375,
-        tilt=0.0,
-        energy=incoming_energy,
-    )
-    q1_tm_entry, q1_tm_exit = misalignment_matrix_jax(misalignments[0:2])
-    d_q1_q2_tm = base_rmatrix_jax(
-        length=0.428, k1=0.0, hx=0.0, species_mass_eV=510998.9375
-    )
-    q2_tm_main = base_rmatrix_jax(
-        length=0.122,
-        k1=magnet_settings[1],
-        hx=0.0,
-        species_mass_eV=510998.9375,
-        tilt=0.0,
-        energy=incoming_energy,
-    )
-    q2_tm_entry, q2_tm_exit = misalignment_matrix_jax(misalignments[2:4])
-    d_q2_cv_tm = base_rmatrix_jax(
-        length=0.204, k1=0.0, hx=0.0, species_mass_eV=510998.9375
-    )
-    cv_tm_main = (
-        jnp.eye(7)
-        .at[..., 0, 1]
-        .set(0.02)
-        .at[..., 2, 3]
-        .set(0.02)
-        .at[..., 3, 6]
-        .set(magnet_settings[2])
-        .at[..., 4, 5]
-        .set(-0.02 / beta**2 * igamma2)
-    )
-    d_cv_q3_tm = base_rmatrix_jax(
-        length=0.204, k1=0.0, hx=0.0, species_mass_eV=510998.9375
-    )
-    q3_tm_main = base_rmatrix_jax(
-        length=0.122,
-        k1=magnet_settings[3],
-        hx=0.0,
-        species_mass_eV=510998.9375,
-        tilt=0.0,
-        energy=incoming_energy,
-    )
-    q3_tm_entry, q3_tm_exit = misalignment_matrix_jax(misalignments[4:6])
-    d_q3_ch_tm = base_rmatrix_jax(
-        length=0.179, k1=0.0, hx=0.0, species_mass_eV=510998.9375
-    )
-    ch_tm_main = (
-        jnp.eye(7)
-        .at[..., 0, 1]
-        .set(0.02)
-        .at[..., 1, 6]
-        .set(magnet_settings[4])
-        .at[..., 2, 3]
-        .set(0.02)
-        .at[..., 4, 5]
-        .set(-0.02 / beta**2 * igamma2)
-    )
-    d_ch_s_tm = base_rmatrix_jax(
-        length=0.45, k1=0.0, hx=0.0, species_mass_eV=510998.9375
-    )
-
-    return (
-        d_ch_s_tm
-        @ ch_tm_main
-        @ d_q3_ch_tm
-        @ q3_tm_exit
-        @ q3_tm_main
-        @ q3_tm_entry
-        @ d_cv_q3_tm
-        @ cv_tm_main
-        @ d_q2_cv_tm
-        @ q2_tm_exit
-        @ q2_tm_main
-        @ q2_tm_entry
-        @ d_q1_q2_tm
-        @ q1_tm_exit
-        @ q1_tm_main
-        @ q1_tm_entry
-        @ d_q1_tm
-    )
-
-
-def base_rmatrix_jax(
-    length: jnp.ndarray,
-    k1: jnp.ndarray,
-    hx: jnp.ndarray,
-    species_mass_eV: jnp.ndarray,
-    tilt: torch.Tensor | None = None,
-    energy: torch.Tensor | None = None,
-) -> torch.Tensor:
-    """
-    Create a universal transfer matrix for a beamline element.
-
-    :param length: Length of the element in m.
-    :param k1: Quadrupole strength in 1/m**2.
-    :param hx: Curvature (1/radius) of the element in 1/m**2.
-    :param species: Particle species of the beam.
-    :param tilt: Roation of the element relative to the longitudinal axis in rad.
-    :param energy: Beam energy in eV.
-    :return: Transfer matrix for the element.
-    """
-    tilt = tilt if tilt is not None else jnp.array(0.0)
-    energy = energy if energy is not None else jnp.array(0.0)
-
-    _, igamma2, beta = compute_relativistic_factors_jax(energy, species_mass_eV)
-
-    # Avoid division by zero
-    k1 = jnp.where(k1 == 0, 1e-12, k1)
-
-    kx2 = k1 + hx**2
-    ky2 = -k1
-    kx = jnp.sqrt(kx2 + 0j)
-    ky = jnp.sqrt(ky2 + 0j)
-    cx = jnp.cos(kx * length).real
-    cy = jnp.cos(ky * length).real
-    sy = (jnp.sin(ky * length) / ky).real
-    sx = (jnp.sin(kx * length) / kx).real
-    dx = hx / kx2 * (1.0 - cx)
-    r56 = hx**2 * (length - sx) / kx2 / beta**2
-
-    r56 = r56 - length / beta**2 * igamma2
-
-    # vector_shape = jnp.broadcast_shapes(
-    #     length.shape, k1.shape, hx.shape, tilt.shape, energy.shape
-    # )
-
-    R = jnp.eye(7)  # .repeat(*vector_shape, 1, 1)
-    R = R.at[..., 0, 0].set(cx)
-    R = R.at[..., 0, 1].set(sx)
-    R = R.at[..., 0, 5].set(dx / beta)
-    R = R.at[..., 1, 0].set(-kx2 * sx)
-    R = R.at[..., 1, 1].set(cx)
-    R = R.at[..., 1, 5].set(sx * hx / beta)
-    R = R.at[..., 2, 2].set(cy)
-    R = R.at[..., 2, 3].set(sy)
-    R = R.at[..., 3, 2].set(-ky2 * sy)
-    R = R.at[..., 3, 3].set(cy)
-    R = R.at[..., 4, 0].set(sx * hx / beta)
-    R = R.at[..., 4, 1].set(dx / beta)
-    R = R.at[..., 4, 5].set(r56)
-
-    return R
-
-
-def misalignment_matrix_jax(
-    misalignment: jnp.ndarray,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Shift the beam for tracking beam through misaligned elements."""
-    R_exit = (
-        jnp.eye(7)
-        .at[..., 0, 6]
-        .set(misalignment[..., 0])
-        .at[..., 2, 6]
-        .set(misalignment[..., 1])
-    )
-    R_entry = (
-        jnp.eye(7)
-        .at[..., 0, 6]
-        .set(-misalignment[..., 0])
-        .at[..., 2, 6]
-        .set(-misalignment[..., 1])
-    )
-    return R_entry, R_exit
-
-
-def compute_relativistic_factors_jax(
-    energy: torch.Tensor, particle_mass_eV: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    gamma = energy / particle_mass_eV
-    igamma2 = jnp.where(gamma == 0.0, 0.0, 1 / gamma**2)
-    beta = jnp.sqrt(1 - igamma2)
-
-    return gamma, igamma2, beta
