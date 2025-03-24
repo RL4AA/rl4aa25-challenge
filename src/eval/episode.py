@@ -14,8 +14,11 @@ from scipy.ndimage import uniform_filter
 
 from ..environments.ea import TransverseTuning
 from ..utils import deep_equal
-from .utils import (parse_problem_index, plot_beam_parameters_on_screen,
-                    plot_screen_image)
+from .utils import (
+    parse_problem_index,
+    plot_beam_parameters_on_screen,
+    plot_screen_image,
+)
 
 plt.style.use(["science", "nature", "no-latex"])
 

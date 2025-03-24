@@ -4,14 +4,18 @@ import gymnasium as gym
 import numpy as np
 import torch.nn as nn
 import wandb
-from gymnasium.wrappers import (FlattenObservation, FrameStack, RecordVideo,
-                                RescaleAction, TimeLimit)
+from gymnasium.wrappers import (
+    FlattenObservation,
+    FrameStack,
+    RecordVideo,
+    RescaleAction,
+    TimeLimit,
+)
 from rl_zoo3 import linear_schedule
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import (DummyVecEnv, SubprocVecEnv,
-                                              VecNormalize)
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
 from ..environments import ea

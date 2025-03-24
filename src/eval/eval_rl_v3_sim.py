@@ -3,8 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from gymnasium import spaces
-from gymnasium.wrappers import (FlattenObservation, FrameStack, RescaleAction,
-                                TimeLimit)
+from gymnasium.wrappers import FlattenObservation, FrameStack, RescaleAction, TimeLimit
 from stable_baselines3.common.base_class import BaseAlgorithm
 from tqdm import tqdm
 
