@@ -1,6 +1,6 @@
-import os
 import asyncio
 import logging
+import os
 import subprocess
 import threading
 from collections import OrderedDict
@@ -11,8 +11,8 @@ import gymnasium as gym
 import numpy as np
 import torch
 from cheetah.utils.segment_3d_builder import Segment3DBuilder
-from gymnasium import Wrapper
 from dotenv import load_dotenv
+from gymnasium import Wrapper
 
 from beam_3d_visualizer.beam_server.websocket_wrapper import WebSocketWrapper
 
@@ -355,12 +355,16 @@ class BeamVisualizationWrapper(Wrapper):
         def run_web_server():
             try:
                 # Determine the mode and load the appropriate .env file
-                node_env = os.getenv("NODE_ENV", "development")  # Default to development
+                node_env = os.getenv(
+                    "NODE_ENV", "development"
+                )  # Default to development
                 if node_env != "production":
                     os.environ["NODE_ENV"] = "production"
-                    node_env = os.getenv('NODE_ENV')
+                    node_env = os.getenv("NODE_ENV")
                     env_file = script_dir.parent / ".env.production"
-                    load_dotenv(dotenv_path=env_file, override=True)  # Load with override existing vars to ensure latest values
+                    load_dotenv(
+                        dotenv_path=env_file, override=True
+                    )  # Load with override existing vars to ensure latest values
 
                 logger.info(f"Running in mode: {node_env}")
 
@@ -398,7 +402,8 @@ class BeamVisualizationWrapper(Wrapper):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    env=os.environ.copy(),  # Pass environment variables (e.g., PORT from .env)
+                    # Pass environment variables (e.g., PORT from .env)
+                    env=os.environ.copy(),
                 )
 
                 # Log output for debugging
