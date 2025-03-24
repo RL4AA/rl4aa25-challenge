@@ -15,7 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Define constants at module level
-DEFAULT_WS_HOST = "localhost"
+DEFAULT_WS_HOST = "0.0.0.0"
 DEFAULT_WS_PORT = 8081
 DEFAULT_CONNECTION_TIMEOUT = 1.0
 DEFAULT_SPREAD_SCALE_FACTOR = 15
@@ -107,7 +107,9 @@ class WebSocketWrapper(gym.Wrapper):
     async def _run_server(self):
         """Run the WebSocket server."""
         self.server = await websockets.serve(
-            self._handle_client, self.ws_host, self.ws_port
+            self._handle_client,
+            host=self.ws_host,
+            port=self.ws_port,
         )
         logger.info(f"WebSocket server running on ws://{self.ws_host}:{self.ws_port}")
         await self.server.wait_closed()
@@ -213,4 +215,4 @@ class WebSocketWrapper(gym.Wrapper):
 
             # Add delay after broadcasting to allow animation to complete
             # before sending new
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(1.25)

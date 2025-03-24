@@ -1,3 +1,4 @@
+import os
 import asyncio
 import logging
 import subprocess
@@ -11,8 +12,16 @@ import numpy as np
 import torch
 from cheetah.utils.segment_3d_builder import Segment3DBuilder
 from gymnasium import Wrapper
+from dotenv import load_dotenv
 
 from beam_3d_visualizer.beam_server.websocket_wrapper import WebSocketWrapper
+
+# Calculate the path to the .env file, one levels up from the script's location
+script_dir = Path(__file__).resolve().parent  # Directory of the current script
+env_path = script_dir.parent / ".env"  # Two levels up to beam_3d_visualizer/.env
+
+# Load the .env file
+load_dotenv(dotenv_path=env_path)
 
 # Configure logging
 logging.basicConfig(
@@ -20,8 +29,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+logger.info(f"Loaded .env from {env_path}")
+logger.info(f"NODE_ENV: {os.getenv('NODE_ENV')}")
+logger.info(f"VITE_FRONTEND_PORT: {os.getenv('VITE_FRONTEND_PORT')}")
+
 # Define constants at module level
-DEFAULT_HTTP_HOST = "localhost"
+DEFAULT_HTTP_HOST = "0.0.0.0"
 DEFAULT_HTTP_PORT = 5173
 DEFAULT_NUM_PARTICLES = 1000
 BEAM_SOURCE_COMPONENT = "AREASOLA1"
@@ -78,7 +91,7 @@ class BeamVisualizationWrapper(Wrapper):
         self.incoming_particle_beam = None
         self.last_action = np.zeros(5, dtype=np.float32)
 
-        # Start the JavaScript web application
+        # Start the JavaScript web application (dev or prod mode)
         self._start_web_application()
 
         # Set up 3D visualization
@@ -300,7 +313,7 @@ class BeamVisualizationWrapper(Wrapper):
 
         # Add delay after broadcasting to allow animation to complete
         # before sending new data
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(1.25)
 
     def close(self):
         """
@@ -341,21 +354,51 @@ class BeamVisualizationWrapper(Wrapper):
 
         def run_web_server():
             try:
-                # Start Vite development server
-                cmd = [
-                    "npx",
-                    "vite",
-                    "--host",
-                    self.http_host,
-                    "--port",
-                    str(self.http_port),
-                ]
+                # Determine the mode and load the appropriate .env file
+                node_env = os.getenv("NODE_ENV", "development")  # Default to development
+                if node_env != "production":
+                    os.environ["NODE_ENV"] = "production"
+                    node_env = os.getenv('NODE_ENV')
+                    env_file = script_dir.parent / ".env.production"
+                    load_dotenv(dotenv_path=env_file, override=True)  # Load with override existing vars to ensure latest values
+
+                logger.info(f"Running in mode: {node_env}")
+
+                if node_env != "production":
+                    # Development mode: Start Vite dev server
+                    # Start Vite development server
+                    cmd = [
+                        "npx",
+                        "vite",
+                        "--host",
+                        self.http_host,
+                        "--port",
+                        str(self.http_port),
+                    ]
+                    logger.info(
+                        f"Starting Vite dev server"
+                        f" on http://{self.http_host}:{self.http_port}"
+                    )
+                else:
+                    # Production mode: Start Express server (server.js)
+                    dist_path = self.base_path.parent / "dist"
+                    if not dist_path.exists():
+                        raise FileNotFoundError(
+                            f"Pre-built dist folder not found at {dist_path}"
+                        )
+                    cmd = ["node", "server.js"]
+                    logger.info(
+                        f"Starting Express server (server.js)"
+                        f" on http://{self.http_host}:{self.http_port}"
+                    )
+
                 self.web_process = subprocess.Popen(
                     cmd,
                     cwd=self.base_path.parent,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    env=os.environ.copy(),  # Pass environment variables (e.g., PORT from .env)
                 )
 
                 # Log output for debugging
@@ -374,7 +417,7 @@ class BeamVisualizationWrapper(Wrapper):
 
         # Give the server a moment to start
         logger.info(
-            f"Started JavaScript web application on "
+            f"JavaScript web application setup initiated on "
             f"http://{self.http_host}:{self.http_port}"
         )
 
