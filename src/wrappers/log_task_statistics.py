@@ -1,7 +1,8 @@
 import gymnasium as gym
 import numpy as np
-import wandb
 from gymnasium import logger
+
+import wandb
 
 from ..eval import Episode
 
@@ -123,8 +124,18 @@ class LogTaskStatistics(gym.Wrapper):
         on_screen_reward = 0
         magnet_change_reward = 0
         for info in episode.infos[1:]:
-            beam_reward += info["beam_reward"]
-            on_screen_reward += info["on_screen_reward"]
-            magnet_change_reward += info["magnet_change_reward"]
+            beam_reward += (
+                info["beam_reward"] if info.get("beam_reward") is not None else 0
+            )
+            on_screen_reward += (
+                info["on_screen_reward"]
+                if info.get("on_screen_reward") is not None
+                else 0
+            )
+            magnet_change_reward += (
+                info["magnet_change_reward"]
+                if info.get("magnet_change_reward") is not None
+                else 0
+            )
 
         return beam_reward, on_screen_reward, magnet_change_reward

@@ -9,12 +9,7 @@ from src.wrappers import PlotEpisode
 # TODO Test that episode trigger behaves like RecordVideo
 
 
-@pytest.mark.parametrize(
-    "section",
-    [
-        pytest.param(ea, marks=pytest.mark.ea),
-    ],
-)
+@pytest.mark.parametrize("section", [pytest.param(ea, marks=pytest.mark.ea)])
 @pytest.mark.parametrize("generate_screen_images", [True, False])
 def test_check_env(section, generate_screen_images, tmp_path):
     """Test that the `PlotEpisode` wrapper throws no exceptions under `check_env`."""
@@ -28,12 +23,7 @@ def test_check_env(section, generate_screen_images, tmp_path):
     check_env(env)
 
 
-@pytest.mark.parametrize(
-    "section",
-    [
-        pytest.param(ea, marks=pytest.mark.ea),
-    ],
-)
+@pytest.mark.parametrize("section", [pytest.param(ea, marks=pytest.mark.ea)])
 @pytest.mark.parametrize("generate_screen_images", [True, False])
 def test_trigger_like_record_video(section, generate_screen_images, tmp_path):
     """

@@ -1,8 +1,8 @@
 from functools import partial
 
 import gymnasium as gym
+import numpy as np
 import torch.nn as nn
-import wandb
 from gymnasium.wrappers import (
     FlattenObservation,
     FrameStack,
@@ -17,14 +17,11 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
+import wandb
+
 from ..environments import ea
 from ..utils import save_config
-from ..wrappers import (
-    LogTaskStatistics,
-    PlotEpisode,
-    PolishedDonkeyReward,
-    RescaleObservation,
-)
+from ..wrappers import LogTaskStatistics, PlotEpisode, RescaleObservation
 
 
 def main() -> None:
@@ -34,11 +31,11 @@ def main() -> None:
         "max_quad_setting": 30.0,
         "max_quad_delta": 30.0,
         "max_steerer_delta": 6.1782e-3,
-        "magnet_init_mode": "random",
+        "magnet_init_mode": np.array([10.0, -10.0, 0.0, 10.0, 0.0]),
         "incoming_mode": "random",
         "misalignment_mode": "random",
         "max_misalignment": 5e-4,
-        "target_beam_mode": "random",
+        "target_beam_mode": np.zeros(4),
         "threshold_hold": 1,
         "clip_magnets": True,
         # Reward (also environment)
@@ -63,13 +60,13 @@ def main() -> None:
         "max_episode_steps": 50,
         "polished_donkey_reward": False,
         # RL algorithm
-        "batch_size": 128,
+        "batch_size": 64,
         "learning_rate": 0.0003,
-        "lr_schedule": "linear",  # Can be "constant" or "linear"
+        "lr_schedule": "constant",  # Can be "constant" or "linear"
         "gamma": 0.99,
         "n_envs": 40,
-        "n_steps": 128,
-        "ent_coef": 0.01,
+        "n_steps": 64,
+        "ent_coef": 0.0,
         "n_epochs": 10,
         "gae_lambda": 0.95,
         "clip_range": 0.2,
@@ -84,7 +81,7 @@ def main() -> None:
         "net_arch": "small",  # Can be "small" or "medium"
         "activation_fn": "Tanh",  # Tanh, ReLU, GELU
         "ortho_init": True,  # True, False
-        "log_std_init": -2.3,
+        "log_std_init": 0.0,
         # SB3 config
         "sb3_device": "auto",
         "vec_env": "subproc",
@@ -96,8 +93,8 @@ def main() -> None:
 def train(config: dict) -> None:
     # Setup wandb
     wandb.init(
-        project="ares-ea-v3",
         entity="msk-ipc",
+        project="rl4aa-tutorial-2025-dev",
         sync_tensorboard=True,
         monitor_gym=True,
         config=config,
@@ -115,7 +112,7 @@ def train(config: dict) -> None:
         vec_env = SubprocVecEnv(
             [
                 partial(make_env, config) for _ in range(config["n_envs"])
-            ]  # TODO: Might need to be "fork" for Maxwell to terminate properly
+            ],  # TODO: Might need to be "fork" for Maxwell to terminate properly
         )
     else:
         raise ValueError(f"Invalid value \"{config['vec_env']}\" for dummy")
@@ -204,10 +201,11 @@ def make_env(
     env = ea.TransverseTuning(
         backend="cheetah",
         backend_args={
-            "incoming_mode": config["incoming_mode"],
-            "misalignment_mode": config["misalignment_mode"],
-            "max_misalignment": config["max_misalignment"],
             "generate_screen_images": plot_episode,
+            "incoming_mode": config["incoming_mode"],
+            "max_misalignment": config["max_misalignment"],
+            "misalignment_mode": config["misalignment_mode"],
+            "simulate_finite_screen": config["simulate_finite_screen"],
         },
         action_mode=config["action_mode"],
         magnet_init_mode=config["magnet_init_mode"],
@@ -216,19 +214,8 @@ def make_env(
         max_steerer_delta=config["max_steerer_delta"],
         target_beam_mode=config["target_beam_mode"],
         target_threshold=config["target_threshold"],
-        threshold_hold=config["threshold_hold"],
+        # threshold_hold=config["threshold_hold"],
         clip_magnets=config["clip_magnets"],
-        beam_param_transform=config["beam_param_transform"],
-        beam_param_combiner=config["beam_param_combiner"],
-        beam_param_combiner_args=config["beam_param_combiner_args"],
-        beam_param_combiner_weights=config["beam_param_combiner_weights"],
-        magnet_change_transform=config["magnet_change_transform"],
-        magnet_change_combiner=config["magnet_change_combiner"],
-        magnet_change_combiner_args=config["magnet_change_combiner_args"],
-        magnet_change_combiner_weights=config["magnet_change_combiner_weights"],
-        final_combiner=config["final_combiner"],
-        final_combiner_args=config["final_combiner_args"],
-        final_combiner_weights=config["final_combiner_weights"],
         render_mode="rgb_array",
     )
     env = TimeLimit(env, config["max_episode_steps"])
@@ -241,12 +228,10 @@ def make_env(
         )
     if log_task_statistics:
         env = LogTaskStatistics(env)
-    if config["normalize_observation"] and not config["running_obs_norm"]:
+    if config["normalize_observation"]:
         env = RescaleObservation(env, -1, 1)
     if config["rescale_action"]:
         env = RescaleAction(env, -1, 1)
-    if config["polished_donkey_reward"]:
-        env = PolishedDonkeyReward(env)
     env = FlattenObservation(env)
     if config["frame_stack"] > 1:
         env = FrameStack(env, config["frame_stack"])

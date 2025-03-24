@@ -1,22 +1,12 @@
-black
-botorch
-cheetah-accelerator==0.7.0
-flake8
-gymnasium[other]==1.0.0
-ipympl
-ipywidgets
-isort
+cheetah-accelerator==0.7.1
+gymnasium==0.29.1   # Fixed for now to prevent subprocess crashing
 jupyter
 matplotlib
-numpy
-opencv-python
-pytest
-rl_zoo3
+rl_zoo3==2.3.0
 SciencePlots
 scipy
 seaborn
-stable-baselines3==2.4.0
+stable-baselines3
 tensorboard
 tqdm
 wandb
-xopt>=2.0.0
