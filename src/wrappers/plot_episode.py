@@ -4,9 +4,8 @@ from typing import Callable
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
-from gymnasium import logger
-
 import wandb
+from gymnasium import logger
 
 from ..eval import Episode
 

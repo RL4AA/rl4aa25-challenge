@@ -3,6 +3,7 @@ from functools import partial
 import gymnasium as gym
 import numpy as np
 import torch.nn as nn
+import wandb
 from gymnasium.wrappers import (
     FlattenObservation,
     FrameStack,
@@ -16,8 +17,6 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
-
-import wandb
 
 from ..environments import ea
 from ..utils import save_config
