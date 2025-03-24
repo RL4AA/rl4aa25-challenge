@@ -4,4 +4,3 @@ log
 models
 plots
 wandb
-data/evaluate_policy/
