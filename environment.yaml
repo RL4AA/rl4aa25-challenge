@@ -2,7 +2,7 @@ name: rl4aa25-challenge
 channels:
   - conda-forge
 dependencies:
-  - python>=3.12.9
+  - python=3.11.11
   - pip>=25.0.1
   - nodejs
   - pip:
