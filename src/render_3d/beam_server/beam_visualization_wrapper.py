@@ -91,6 +91,9 @@ class BeamVisualizationWrapper(Wrapper):
         self.incoming_particle_beam = None
         self.last_action = np.zeros(5, dtype=np.float32)
 
+        # Ensures the necessary npm dependencies are installed
+        self._setup()
+
         # Start the JavaScript web application (dev or prod mode)
         self._start_web_application()
 
@@ -346,6 +349,47 @@ class BeamVisualizationWrapper(Wrapper):
         """
         return np.array(self.screen.resolution) / 2 * np.array(self.screen.pixel_size)
 
+    def _setup(self):
+        """
+        Automates the setup process by running npm install to install dependencies.
+        This should be run once to ensure the JavaScript dependencies are installed.
+        """
+        try:
+            # Path to the node_modules directory
+            node_modules_path = os.path.join(self.base_path.parent, "node_modules")
+
+            # Check if package.json exists to confirm we are in the correct directory
+            package_json_path = os.path.join(self.base_path.parent, "package.json")
+            if not os.path.exists(package_json_path):
+                raise FileNotFoundError(
+                    f"{package_json_path} not found."
+                    f" Make sure you are in the correct project directory."
+                )
+
+            # Check if node_modules exists and is not empty
+            if os.path.exists(node_modules_path) and os.listdir(node_modules_path):
+                logger.info("Dependencies are already installed. Skipping npm install.")
+            else:
+                logger.info("Running npm install...")
+                result = subprocess.run(
+                    ["npm", "install"],
+                    cwd=self.base_path.parent,  # Run in directory with package.json
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+
+                # Log the output for debugging purposes
+                if result.returncode == 0:
+                    logger.info("npm install completed successfully.")
+                else:
+                    logger.error(f"npm install failed with error: {result.stderr}")
+                    raise RuntimeError(f"npm install failed: {result.stderr}")
+
+        except Exception as e:
+            logger.error(f"Error during setup: {e}")
+            raise
+
     def _start_web_application(self):
         """
         Start the JavaScript web application (Vite development server)
@@ -355,14 +399,12 @@ class BeamVisualizationWrapper(Wrapper):
         def run_web_server():
             try:
                 # Determine the mode and load the appropriate .env file
-                node_env = os.getenv(
-                    "NODE_ENV", "production"
-                )  # Default to development
+                node_env = os.getenv("NODE_ENV", "production")
                 if node_env == "production":
                     env_file = script_dir.parent / ".env.production"
-                      # Load with override existing vars to ensure latest values
+                    # Load with override existing vars to ensure latest values
                     load_dotenv(
-                        dotenv_path=env_file, 
+                        dotenv_path=env_file,
                         override=True,
                     )
 
