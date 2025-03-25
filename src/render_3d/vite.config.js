@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { copy } from 'vite-plugin-copy';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig(({ mode }) => {
   // Load environment variables based on mode
@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     define: {
-      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+      'import.meta.env.MODE': JSON.stringify(mode),
     },
     envPrefix: 'VITE_', // Stick to Vite convention
     base, // Use the dynamically determined base
@@ -33,9 +33,9 @@ export default defineConfig(({ mode }) => {
       minify: 'esbuild',  // Faster minification
     },
     plugins: [
-      copy({
+      viteStaticCopy({
         targets: [
-          { src: 'serve.json', dest: 'dist' }
+          { src: 'serve.json', dest: './' }
         ]
       })
     ]
