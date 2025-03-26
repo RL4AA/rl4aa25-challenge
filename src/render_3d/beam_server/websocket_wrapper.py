@@ -9,8 +9,9 @@ import numpy as np
 import websockets
 
 # Configure logging
+log_level = logging.INFO
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+    level=log_level, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
