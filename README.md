@@ -39,7 +39,6 @@ Please use the following DOI when citing this code:
 
 ## Getting started
 
-- You will need **Python 3.12 or higher** to run this code &#x2757;
 - You will require about **1 GB of free disk space** &#x2757;
 - Make sure you have Git installed in your terminal &#x2757;
 
