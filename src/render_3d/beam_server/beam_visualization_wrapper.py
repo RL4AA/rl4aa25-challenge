@@ -293,6 +293,8 @@ class BeamVisualizationWrapper(Wrapper):
         # Run simulation
         self._simulate()
 
+        info.update({"stop_simulation": self.data["stop_simulation"]})
+
         return observation, reward, terminated, truncated, info
 
     async def render(self):
@@ -308,10 +310,7 @@ class BeamVisualizationWrapper(Wrapper):
         if self.render_mode != "human":
             return  # Skip rendering if not in human mode
 
-        # Update WebSocket broadcasting data
-        self.env.data = self.data
-
-        # Delegate to WebSocketWrapper for broadcasting
+        # Delegate to WebSocketWrapper for broadcasting the data
         await self.env.broadcast(self.data)
 
         # Add delay after broadcasting to allow animation to complete
@@ -585,6 +584,7 @@ class BeamVisualizationWrapper(Wrapper):
             {
                 "screen_reading": self.screen_reading.tolist(),
                 "bunch_count": self.current_step,
+                "stop_simulation": self.env.stop_simulation,
             }
         )
 

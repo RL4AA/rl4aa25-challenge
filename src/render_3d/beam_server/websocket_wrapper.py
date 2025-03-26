@@ -77,6 +77,7 @@ class WebSocketWrapper(gym.Wrapper):
         self.mean_scale_factor = mean_scale_factor
 
         self._control_action = np.zeros(5, dtype=np.float32)  # "no-op" action
+        self.stop_simulation = False
 
         # Start the WebSocket server in a separate thread
         self._lock = threading.Lock()
@@ -135,6 +136,7 @@ class WebSocketWrapper(gym.Wrapper):
 
                         self.spread_scale_factor = controls.get("scaleBeamSpread", 0.0)
                         self.mean_scale_factor = controls.get("scaleBeamPosition", 0.0)
+                        self.stop_simulation = controls.get("stopSimulation", False)
 
                         areamqzm1 = controls.get("AREAMQZM1", 0.0)
                         areamqzm2 = controls.get("AREAMQZM2", 0.0)
