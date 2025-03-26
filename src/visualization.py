@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Optional
 
 import cv2
 import gymnasium as gym
@@ -14,10 +15,10 @@ from src.render_3d.beam_server.beam_visualization_wrapper import (
 
 
 async def run_simulation_async(
-        env: ea.TransverseTuning,
-        logger: logging.Logger,
-        simulation_task: asyncio.Task
-    ):
+    env: ea.TransverseTuning,
+    simulation_task: asyncio.Task,
+    logger: Optional[logging.Logger] = None,
+):
     """Run the simulation loop, stepping the environment with control actions."""
     print("\n--- Starting simulation loop ---")
 
@@ -46,13 +47,14 @@ async def run_simulation_async(
         # Update step count
         step_count += 1
 
-        logger.info(
-            "Step %d: Action = %s, Reward = %s, Observation = %s",
-            step_count,
-            env.last_action,
-            reward,
-            observation,
-        )
+        if logger is not None:
+            logger.debug(
+                "Step %d: Action = %s, Reward = %s, Observation = %s",
+                step_count,
+                env.last_action,
+                reward,
+                observation,
+            )
 
         done = truncated  # or terminated
 
@@ -65,7 +67,7 @@ async def run_simulation_async(
     print("Simulation completed.")
 
 
-async def visualization_main(logger: logging.Logger):
+async def visualization_main(logger: Optional[logging.Logger] = None):
     """Main entry point to set up the environment and start the simulation."""
     # Initialize the environment and wrap it with BeamVisualizationWrapper
     env = ea.TransverseTuning(
@@ -82,15 +84,15 @@ async def visualization_main(logger: logging.Logger):
         await asyncio.sleep(5.0)  # Small delay to prevent CPU overload
 
     # Create the background simulation task
-    simulation_task = asyncio.create_task(run_simulation_async(
-        env,
-        logger,
-        simulation_task=None
+    simulation_task = asyncio.create_task(
+        run_simulation_async(
+            env=env, simulation_task=asyncio.current_task(), logger=logger
         )
     )
 
     # Return the task to allow cancellation or monitoring if needed
     return simulation_task
+
 
 def restart_manual_tuning(env: gym.Env):
     """Restart the manual tuning process and display in the jupyter notebook cell."""
