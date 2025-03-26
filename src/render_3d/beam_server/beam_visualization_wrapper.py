@@ -377,6 +377,7 @@ class BeamVisualizationWrapper(Wrapper):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    shell=True
                 )
 
                 # Log the output for debugging purposes
@@ -446,6 +447,7 @@ class BeamVisualizationWrapper(Wrapper):
                     text=True,
                     # Pass environment variables (e.g., PORT from .env)
                     env=os.environ.copy(),
+                    shell=True,
                 )
 
                 # Log output for debugging
