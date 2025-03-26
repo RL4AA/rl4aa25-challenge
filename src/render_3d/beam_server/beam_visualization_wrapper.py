@@ -24,14 +24,19 @@ env_path = script_dir.parent / ".env"  # Two levels up to beam_3d_visualizer/.en
 # Load the .env file
 load_dotenv(dotenv_path=env_path)
 
-# Configure logging
-log_level = logging.DEBUG
+# Set logging level based on environment
+debug_mode = os.getenv("DEBUG_MODE", "False").lower() == "true"
+
+# Setup logging with conditional log level
+log_level = (
+    logging.DEBUG if debug_mode else logging.WARNING
+)  # Set to WARNING to suppress info/debug logs
 logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-logger.debug(f"Loaded .env from {env_path}")
-logger.debug(f"NODE_ENV: {os.getenv('NODE_ENV')}")
-logger.debug(f"VITE_FRONTEND_PORT: {os.getenv('VITE_FRONTEND_PORT')}")
+logger.info(f"Loaded .env from {env_path}")
+logger.info(f"NODE_ENV: {os.getenv('NODE_ENV')}")
+logger.info(f"VITE_FRONTEND_PORT: {os.getenv('VITE_FRONTEND_PORT')}")
 
 # Define constants at module level
 DEFAULT_HTTP_HOST = "127.0.0.1"
@@ -262,7 +267,7 @@ class BeamVisualizationWrapper(Wrapper):
             )
 
         # Log the initial beam state for debugging
-        logger.debug(
+        logger.info(
             f"Initialized incoming particle beam with {self.num_particles} particles."
         )
 
@@ -326,7 +331,7 @@ class BeamVisualizationWrapper(Wrapper):
             try:
                 self.web_process.terminate()
                 self.web_process.wait(timeout=5)
-                logger.debug("Terminated JavaScript web application process.")
+                logger.info("Terminated JavaScript web application process.")
             except subprocess.TimeoutExpired:
                 logger.warning("Forcibly killing web application process...")
                 self.web_process.kill()
@@ -367,11 +372,9 @@ class BeamVisualizationWrapper(Wrapper):
 
             # Check if node_modules exists and is not empty
             if os.path.exists(node_modules_path) and os.listdir(node_modules_path):
-                logger.debug(
-                    "Dependencies are already installed. Skipping npm install."
-                )
+                logger.info("Dependencies are already installed. Skipping npm install.")
             else:
-                logger.debug("Running npm install...")
+                logger.info("Running npm install...")
                 result = subprocess.run(
                     ["npm", "install"],
                     cwd=self.base_path.parent,  # Run in directory with package.json
@@ -385,7 +388,7 @@ class BeamVisualizationWrapper(Wrapper):
 
                 # Log the output for debugging purposes
                 if result.returncode == 0:
-                    logger.debug("npm install completed successfully.")
+                    logger.info("npm install completed successfully.")
                 else:
                     logger.error(f"npm install failed with error: {result.stderr}")
                     raise RuntimeError(f"npm install failed: {result.stderr}")
@@ -501,9 +504,7 @@ class BeamVisualizationWrapper(Wrapper):
             outgoing_beam = element.track(references[-1])
             references.append(outgoing_beam)
 
-            logger.debug(
-                f"Tracked beam through element {element.name}: {outgoing_beam}"
-            )
+            logger.info(f"Tracked beam through element {element.name}: {outgoing_beam}")
 
             # Only store particle positions for elements in lattice_component_positions
             if element.name in self.lattice_component_positions:

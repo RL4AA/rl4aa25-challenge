@@ -38,9 +38,14 @@ from trimesh import Scene, Trimesh
 debug_mode = os.getenv("DEBUG_MODE", "False").lower() == "true"
 
 # Setup logging
-logging.basicConfig(level=logging.DEBUG if debug_mode else logging.INFO)
+log_level = logging.DEBUG if debug_mode else logging.WARNING  # Set to WARNING to suppress info/debug logs
+logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
+
+# Create logger instance
 logger = logging.getLogger(__name__)
 
+# Suppress DEBUG logs from trimesh and other libraries
+logging.getLogger("trimesh").setLevel(logging.WARNING)
 
 # Constants
 DEFAULT_SCALE_FACTOR: float = 0.20
@@ -208,7 +213,7 @@ class Segment3DBuilder:
             self.current_position += length
 
         # Represents the total length after processing last element
-        logger.info("Final lattice segment length: %s", self.current_position)
+        logger.debug("Final lattice segment length: %s", self.current_position)
 
         # Export the final scene to a GLTF file
         if is_export_enabled:
@@ -239,14 +244,14 @@ class Segment3DBuilder:
         if type(element) in self.asset_map:
             self._load_and_transform_mesh(element)
             self._track_component_position(element.name)
-            logger.info(
+            logger.debug(
                 "Added %s: %s at position %s",
                 element.__class__.__name__,
                 element.name,
                 self.current_position,
             )
         else:
-            logger.warning("Element type %s not recognized.", type(element).__name__)
+            logger.info("Element type %s not recognized.", type(element).__name__)
 
     def export(self, output_file: Optional[str] = None) -> None:
         """
@@ -268,7 +273,7 @@ class Segment3DBuilder:
 
         try:
             self.scene.export(output_path, include_normals=True)
-            logger.info("Exported 3D scene to %s", output_path)
+            logger.debug("Exported 3D scene to %s", output_path)
         except Exception as e:
             logger.error("Failed to export scene: %s", e)
             raise

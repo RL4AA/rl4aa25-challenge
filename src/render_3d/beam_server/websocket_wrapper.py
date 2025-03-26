@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import threading
 from typing import Any, Dict, Optional, Tuple
 
@@ -8,8 +9,11 @@ import gymnasium as gym
 import numpy as np
 import websockets
 
-# Configure logging
-log_level = logging.DEBUG
+# Set logging level based on environment
+debug_mode = os.getenv("DEBUG_MODE", "False").lower() == "true"
+
+# Setup logging with conditional log level
+log_level = logging.DEBUG if debug_mode else logging.INFO
 logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
