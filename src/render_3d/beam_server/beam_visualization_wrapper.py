@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import subprocess
+import sys
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -24,15 +25,13 @@ env_path = script_dir.parent / ".env"  # Two levels up to beam_3d_visualizer/.en
 load_dotenv(dotenv_path=env_path)
 
 # Configure logging
-log_level = logging.INFO
-logging.basicConfig(
-    level=log_level, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+log_level = logging.DEBUG
+logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-logger.info(f"Loaded .env from {env_path}")
-logger.info(f"NODE_ENV: {os.getenv('NODE_ENV')}")
-logger.info(f"VITE_FRONTEND_PORT: {os.getenv('VITE_FRONTEND_PORT')}")
+logger.debug(f"Loaded .env from {env_path}")
+logger.debug(f"NODE_ENV: {os.getenv('NODE_ENV')}")
+logger.debug(f"VITE_FRONTEND_PORT: {os.getenv('VITE_FRONTEND_PORT')}")
 
 # Define constants at module level
 DEFAULT_HTTP_HOST = "127.0.0.1"
@@ -327,7 +326,7 @@ class BeamVisualizationWrapper(Wrapper):
             try:
                 self.web_process.terminate()
                 self.web_process.wait(timeout=5)
-                logger.info("Terminated JavaScript web application process.")
+                logger.debug("Terminated JavaScript web application process.")
             except subprocess.TimeoutExpired:
                 logger.warning("Forcibly killing web application process...")
                 self.web_process.kill()
@@ -368,21 +367,25 @@ class BeamVisualizationWrapper(Wrapper):
 
             # Check if node_modules exists and is not empty
             if os.path.exists(node_modules_path) and os.listdir(node_modules_path):
-                logger.info("Dependencies are already installed. Skipping npm install.")
+                logger.debug(
+                    "Dependencies are already installed. Skipping npm install."
+                )
             else:
-                logger.info("Running npm install...")
+                logger.debug("Running npm install...")
                 result = subprocess.run(
                     ["npm", "install"],
                     cwd=self.base_path.parent,  # Run in directory with package.json
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    shell=True
+                    shell=(
+                        True if sys.platform == "win32" else None
+                    ),  # Only use shell=True on Windows
                 )
 
                 # Log the output for debugging purposes
                 if result.returncode == 0:
-                    logger.info("npm install completed successfully.")
+                    logger.debug("npm install completed successfully.")
                 else:
                     logger.error(f"npm install failed with error: {result.stderr}")
                     raise RuntimeError(f"npm install failed: {result.stderr}")
@@ -409,7 +412,7 @@ class BeamVisualizationWrapper(Wrapper):
                         override=True,
                     )
 
-                logger.info(f"Running in mode: {node_env}")
+                logger.debug(f"Running in mode: {node_env}")
 
                 if node_env == "development":
                     # Development mode: Start Vite dev server
@@ -422,7 +425,7 @@ class BeamVisualizationWrapper(Wrapper):
                         "--port",
                         str(self.http_port),
                     ]
-                    logger.info(
+                    logger.debug(
                         f"Starting Vite dev server"
                         f" on http://{self.http_host}:{self.http_port}"
                     )
@@ -434,7 +437,7 @@ class BeamVisualizationWrapper(Wrapper):
                             f"Pre-built dist folder not found at {dist_path}"
                         )
                     cmd = ["node", "server.js"]
-                    logger.info(
+                    logger.debug(
                         f"Starting Express server (server.js)"
                         f" on http://{self.http_host}:{self.http_port}"
                     )
@@ -447,12 +450,14 @@ class BeamVisualizationWrapper(Wrapper):
                     text=True,
                     # Pass environment variables (e.g., PORT from .env)
                     env=os.environ.copy(),
-                    shell=True,
+                    shell=(
+                        True if sys.platform == "win32" else None
+                    ),  # Only use shell=True on Windows
                 )
 
                 # Log output for debugging
                 for line in self.web_process.stdout:
-                    logger.info(f"Vite stdout: {line.strip()}")
+                    logger.debug(f"Vite stdout: {line.strip()}")
                 for line in self.web_process.stderr:
                     logger.error(f"Vite stderr: {line.strip()}")
 
@@ -465,7 +470,7 @@ class BeamVisualizationWrapper(Wrapper):
         self.web_thread.start()
 
         # Give the server a moment to start
-        logger.info(
+        logger.debug(
             f"JavaScript web application setup initiated on "
             f"http://{self.http_host}:{self.http_port}"
         )

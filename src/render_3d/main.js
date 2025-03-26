@@ -287,13 +287,13 @@ class SceneManager {
         panel.style.color = '#fff';
         panel.style.fontFamily = 'Arial, sans-serif';
         panel.style.fontSize = '12px';
-        panel.style.width = '225px';
+        panel.style.width = '200px';
 
         // Control panel title
         const title = document.createElement('h3');
         title.textContent = 'Control Panel';
         title.style.margin = '0 0 10px 0';
-        title.style.fontSize = '12px';
+        title.style.fontSize = '14px';
         title.style.textAlign = 'center';
         panel.appendChild(title);
 
@@ -331,22 +331,28 @@ class SceneManager {
             input.max = control.max;
             input.step = control.step;
             input.value = control.initial;
-            input.style.width = '120px';
+            input.style.width = '150px';
 
             // Display current value with fixed width
             const valueDisplay = document.createElement('span');
             valueDisplay.id = `${control.id}-value`;
             valueDisplay.textContent = control.initial;
-            valueDisplay.style.marginLeft = '8px';
+            valueDisplay.style.marginLeft = '11px';
             valueDisplay.style.display = 'inline-block'; // Prevent width changes
-            valueDisplay.style.minWidth = '70px';        // Ensure fixed width
-            valueDisplay.style.textAlign = 'right';      // Align numbers neatly
+            valueDisplay.style.minWidth = '10px';        // Ensure fixed width
+            valueDisplay.style.textAlign = 'left';       // Align numbers neatly
 
             // Store default value
             this.defaultValues[control.id] = control.initial;
 
             input.addEventListener('input', () => {
-                valueDisplay.textContent = input.value;
+                let displayValue = input.value;
+                if (control.id === 'AREAMCVM1' || control.id === 'AREAMCHM1') {
+                    displayValue = this.radToMrad(parseFloat(input.value)).toFixed(2);
+                    valueDisplay.textContent = displayValue;
+                } else {
+                    valueDisplay.textContent = displayValue;
+                }
                 this.updateControls(control.id);
             });
 
@@ -463,12 +469,14 @@ class SceneManager {
         plotWindow.style.position = 'fixed';
         plotWindow.style.top = '10px';
         plotWindow.style.right = '10px';
-        plotWindow.style.width = '400px';
-        plotWindow.style.height = '300px';
+        plotWindow.style.width = '300px';   // Default: 400px
+        plotWindow.style.height = '210px';  // Default: 300px
         plotWindow.style.backgroundColor = 'white';
         plotWindow.style.border = '2px solid black';
         plotWindow.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
         plotWindow.style.padding = '10px';
+        plotWindow.style.border = 'none'; // Ensure no border
+        plotWindow.style.backgroundColor = 'black'; // Match background color if needed
         plotWindow.style.zIndex = '1000';
 
         // Create the container for the plot
@@ -517,30 +525,38 @@ class SceneManager {
         // Define initial layout with an empty plot with labels and grid
         const layout = {
             title: {
-                text: "Particle Beam (bunch count: 0)", // Placeholder title
+                text: "Camera Image", // Placeholder title
                 font: { family: 'Arial, sans-serif', size: 16, color: 'white' },
                 x: 0.5
             },
             xaxis: {
-                title: { text: 'X position (mm)', font: { size: 14, color: 'white' } },
+                title: {
+                    text: '', // 'X position (mm)',
+                    font: { size: 14, color: 'white' }
+                },
                 range: [-4, 4],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
+                visible: true,   // Optional: Hide axis
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
-             },
+            },
             yaxis: {
-                title: { text: 'Y position (mm)', font: { size: 14, color: 'black' } },
+                title: {
+                    text: '', // 'Y position (mm)',
+                    font: { size: 14, color: 'black' }
+                },
                 range: [-2, 2],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
+                visible: true,   // Optional: Hide axis
                 tickfont: { color: 'white' },
                 gridcolor: 'white'
             },
-            margin: { l: 100, r: 20, t: 40 , b: 50 },
+            margin: { l: 30, r: 0, t: 40 , b: 30 },
             autosize: true,
             paper_bgcolor: 'black',  // Background outside the plot area
-            plot_bgcolor: 'black'  // Keep graph area transparen
+            plot_bgcolor: 'black'    // Keep graph area transparen
         };
 
         // Initialize an empty heatmap trace to prevent layout conflicts
@@ -550,8 +566,7 @@ class SceneManager {
             y: [...Array(510).keys()],  // Row indices from 0 to 509 (y-axis)
             type: 'heatmap',
             colorscale: 'Viridis',
-            showscale: true,  // Do not include the color scale
-            //colorbar: { title: 'Bunch Count' }
+            showscale: false,  // Do not include the color scale
         };
 
         // Initialize an empty plot with the defined layout
@@ -588,8 +603,7 @@ class SceneManager {
             y: yValues,
             type: 'heatmap',
             colorscale: 'Viridis',  // Use the 'Hot' colorscale for warm hues at high counts, alternatively,'Viridis'
-            showscale: true,  // Remove the color scale
-            //colorbar: { title: 'Bunch Count' }
+            showscale: false,  // Remove the color scale
         };
 
         // Retrieve the current zoom state before updating
@@ -598,7 +612,7 @@ class SceneManager {
         // If the user has zoomed in, preserve their zoom level
         const layout = {
             title: {
-                text: `Particle Beam (bunch count: ${this.currentData.bunch_count})`,
+                text: `Camera Image`,
                 font: {
                     family: 'Arial, sans-serif',
                     size: 16,
@@ -609,7 +623,7 @@ class SceneManager {
             },
             xaxis: {
                 title: {
-                    text: 'X position (mm)',
+                    text: '', // 'X position (mm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -618,13 +632,14 @@ class SceneManager {
                 },
                 range: currentLayout ? currentLayout.xaxis.range : [xMin, xMax],  // Preserve zoom
                 showgrid: true,
-                zeroline: false, //true
+                zeroline: false, // true
+                visible: true,   // Optional: Hide axis
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
             },
             yaxis: {
                 title: {
-                    text: 'Y position (mm)',
+                    text: '', // 'Y position (mm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -634,12 +649,13 @@ class SceneManager {
                 },
                 range: currentLayout ? currentLayout.yaxis.range : [yMin, yMax],  // Preserve zoom
                 showgrid: true,
-                zeroline: false, //true
+                zeroline: false, // true
+                visible: true,   // Optional: Hide axis
                 scaleanchor: 'x', // Ensures equal aspect ratio
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
             },
-            margin: { l: 100, r: 30, t: 40 , b: 50 },
+            margin: { l: 30, r: 0, t: 40 , b: 30 },
             autosize: true,
             paper_bgcolor: 'black',  // Background outside the plot area
             plot_bgcolor: 'black'  // Keep graph area transparent
@@ -771,6 +787,10 @@ class SceneManager {
             }
         });
         return foundObject;
+    }
+
+    radToMrad(rad) {
+        return rad * 1000;
     }
 
     // Rendering & Animation

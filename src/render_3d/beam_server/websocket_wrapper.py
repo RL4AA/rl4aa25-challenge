@@ -9,10 +9,8 @@ import numpy as np
 import websockets
 
 # Configure logging
-log_level = logging.INFO
-logging.basicConfig(
-    level=log_level, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+log_level = logging.DEBUG
+logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Define constants at module level
@@ -102,7 +100,7 @@ class WebSocketWrapper(gym.Wrapper):
 
         self._server_thread = threading.Thread(target=run_server, daemon=True)
         self._server_thread.start()
-        logger.info(
+        logger.debug(
             f"WebSocket server thread started on ws://{self.ws_host}:{self.ws_port}"
         )
 
@@ -113,7 +111,7 @@ class WebSocketWrapper(gym.Wrapper):
             host=self.ws_host,
             port=self.ws_port,
         )
-        logger.info(f"WebSocket server running on ws://{self.ws_host}:{self.ws_port}")
+        logger.debug(f"WebSocket server running on ws://{self.ws_host}:{self.ws_port}")
         await self.server.wait_closed()
 
     async def _handle_client(
@@ -123,7 +121,7 @@ class WebSocketWrapper(gym.Wrapper):
         with self._lock:
             self.connected = True
             self.clients.add(websocket)
-        logger.info("WebSocket connection established.")
+        logger.debug("WebSocket connection established.")
 
         try:
             async for message in websocket:
@@ -164,16 +162,16 @@ class WebSocketWrapper(gym.Wrapper):
                 except json.JSONDecodeError:
                     logger.error("Error: Received invalid JSON data.")
         except asyncio.exceptions.CancelledError:
-            logger.info("WebSocket task was cancelled.")
+            logger.debug("WebSocket task was cancelled.")
             raise
         except websockets.ConnectionClosed:
-            logger.info("WebSocket connection closed by client.")
+            logger.debug("WebSocket connection closed by client.")
         finally:
             with self._lock:
                 self.clients.discard(websocket)
                 if not self.clients:
                     self.connected = False
-            logger.info("Client cleanup completed.")
+            logger.debug("Client cleanup completed.")
 
     async def broadcast(self, message: Dict):
         """Broadcast a message to all connected clients."""
@@ -207,7 +205,7 @@ class WebSocketWrapper(gym.Wrapper):
             self.connected = False
             self.clients.clear()
             self.server.close()
-            logger.info("WebSocket server closed.")
+            logger.debug("WebSocket server closed.")
         super().close()
 
     async def render(self):
