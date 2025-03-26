@@ -965,7 +965,7 @@ class SceneManager {
         // Setup default fallback
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
-        const host = import.meta.env.VITE_PROXY_HOST_NAME || '0.0.0.0';
+        const host = import.meta.env.VITE_PROXY_HOST_NAME || '127.0.0.1';
         const port = import.meta.env.VITE_BACKEND_PORT || '8081';
 
         // Use the environment variable if available, otherwise fallback to a default

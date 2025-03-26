@@ -10,7 +10,7 @@ const app = express();
 
 // Default Vite hostname and port or env variable
 const FRONTEND_PORT = process.env.VITE_FRONTEND_PORT || 5173;
-const PROXY_HOST_NAME = process.env.VITE_PROXY_HOST_NAME || "0.0.0.0";
+const PROXY_HOST_NAME = process.env.VITE_PROXY_HOST_NAME || "127.0.0.1";
 
 // Serve static files from the 'dist' directory
 const distPath = join(__dirname, 'dist');

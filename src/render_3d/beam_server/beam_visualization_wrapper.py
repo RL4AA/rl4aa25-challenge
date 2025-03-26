@@ -35,7 +35,7 @@ logger.info(f"NODE_ENV: {os.getenv('NODE_ENV')}")
 logger.info(f"VITE_FRONTEND_PORT: {os.getenv('VITE_FRONTEND_PORT')}")
 
 # Define constants at module level
-DEFAULT_HTTP_HOST = "0.0.0.0"
+DEFAULT_HTTP_HOST = "127.0.0.1"
 DEFAULT_HTTP_PORT = 5173
 DEFAULT_NUM_PARTICLES = 1000
 BEAM_SOURCE_COMPONENT = "AREASOLA1"

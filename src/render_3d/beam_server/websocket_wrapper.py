@@ -16,7 +16,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Define constants at module level
-DEFAULT_WS_HOST = "0.0.0.0"
+DEFAULT_WS_HOST = "127.0.0.1"
 DEFAULT_WS_PORT = 8081
 DEFAULT_CONNECTION_TIMEOUT = 1.0
 DEFAULT_SPREAD_SCALE_FACTOR = 15
