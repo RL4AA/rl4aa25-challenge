@@ -307,8 +307,7 @@ class SceneManager {
             { id: 'AREAMCHM1', type: 'angle', label: 'AREAMCHM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
             { id: 'particleSpeed', type: 'speed', label: 'Particle Speed', min: 0.001, max: 1.0, step: 0.001, initial: 0.1 },
             { id: 'scaleBeamSpread', type: 'speed', label: 'Scale beam width', min: 1.0, max: 100.0, step: 1.0, initial: 15.0 },
-            { id: 'scaleBeamPosition', type: 'speed', label: 'Scale beam position', min: 1.0, max: 101.0, step: 1, initial: 50.0 },
-            { id: 'stopSimulation', type: 'boolean', label: 'Stop Simulation', initial: false }
+            { id: 'scaleBeamPosition', type: 'speed', label: 'Scale beam position', min: 1.0, max: 101.0, step: 1, initial: 50.0 }
         ];
 
         // Create each slider element
