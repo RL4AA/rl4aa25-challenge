@@ -38,7 +38,9 @@ from trimesh import Scene, Trimesh
 debug_mode = os.getenv("DEBUG_MODE", "False").lower() == "true"
 
 # Setup logging
-log_level = logging.DEBUG if debug_mode else logging.WARNING  # Set to WARNING to suppress info/debug logs
+log_level = (
+    logging.DEBUG if debug_mode else logging.WARNING
+)  # Set to WARNING to suppress info/debug logs
 logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Create logger instance
