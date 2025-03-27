@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import threading
 from typing import Any, Dict, Optional, Tuple
 
@@ -8,14 +9,16 @@ import gymnasium as gym
 import numpy as np
 import websockets
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+# Set logging level based on environment
+debug_mode = os.getenv("DEBUG_MODE", "False").lower() == "true"
+
+# Setup logging with conditional log level
+log_level = logging.DEBUG if debug_mode else logging.INFO
+logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Define constants at module level
-DEFAULT_WS_HOST = "localhost"
+DEFAULT_WS_HOST = "127.0.0.1"
 DEFAULT_WS_PORT = 8081
 DEFAULT_CONNECTION_TIMEOUT = 1.0
 DEFAULT_SPREAD_SCALE_FACTOR = 15
@@ -77,6 +80,7 @@ class WebSocketWrapper(gym.Wrapper):
         self.mean_scale_factor = mean_scale_factor
 
         self._control_action = np.zeros(5, dtype=np.float32)  # "no-op" action
+        self.stop_simulation = False
 
         # Start the WebSocket server in a separate thread
         self._lock = threading.Lock()
@@ -100,16 +104,18 @@ class WebSocketWrapper(gym.Wrapper):
 
         self._server_thread = threading.Thread(target=run_server, daemon=True)
         self._server_thread.start()
-        logger.info(
+        logger.debug(
             f"WebSocket server thread started on ws://{self.ws_host}:{self.ws_port}"
         )
 
     async def _run_server(self):
         """Run the WebSocket server."""
         self.server = await websockets.serve(
-            self._handle_client, self.ws_host, self.ws_port
+            self._handle_client,
+            host=self.ws_host,
+            port=self.ws_port,
         )
-        logger.info(f"WebSocket server running on ws://{self.ws_host}:{self.ws_port}")
+        logger.debug(f"WebSocket server running on ws://{self.ws_host}:{self.ws_port}")
         await self.server.wait_closed()
 
     async def _handle_client(
@@ -119,7 +125,7 @@ class WebSocketWrapper(gym.Wrapper):
         with self._lock:
             self.connected = True
             self.clients.add(websocket)
-        logger.info("WebSocket connection established.")
+        logger.debug("WebSocket connection established.")
 
         try:
             async for message in websocket:
@@ -133,6 +139,7 @@ class WebSocketWrapper(gym.Wrapper):
 
                         self.spread_scale_factor = controls.get("scaleBeamSpread", 0.0)
                         self.mean_scale_factor = controls.get("scaleBeamPosition", 0.0)
+                        self.stop_simulation = controls.get("stopSimulation", False)
 
                         areamqzm1 = controls.get("AREAMQZM1", 0.0)
                         areamqzm2 = controls.get("AREAMQZM2", 0.0)
@@ -159,16 +166,16 @@ class WebSocketWrapper(gym.Wrapper):
                 except json.JSONDecodeError:
                     logger.error("Error: Received invalid JSON data.")
         except asyncio.exceptions.CancelledError:
-            logger.info("WebSocket task was cancelled.")
+            logger.debug("WebSocket task was cancelled.")
             raise
         except websockets.ConnectionClosed:
-            logger.info("WebSocket connection closed by client.")
+            logger.debug("WebSocket connection closed by client.")
         finally:
             with self._lock:
                 self.clients.discard(websocket)
                 if not self.clients:
                     self.connected = False
-            logger.info("Client cleanup completed.")
+            logger.debug("Client cleanup completed.")
 
     async def broadcast(self, message: Dict):
         """Broadcast a message to all connected clients."""
@@ -202,7 +209,7 @@ class WebSocketWrapper(gym.Wrapper):
             self.connected = False
             self.clients.clear()
             self.server.close()
-            logger.info("WebSocket server closed.")
+            logger.debug("WebSocket server closed.")
         super().close()
 
     async def render(self):
@@ -213,4 +220,4 @@ class WebSocketWrapper(gym.Wrapper):
 
             # Add delay after broadcasting to allow animation to complete
             # before sending new
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(1.25)

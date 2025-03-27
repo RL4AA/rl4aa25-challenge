@@ -798,3 +798,11 @@ class Study:
         print(
             f"Sum of magnet changes: {self.median_sum_of_normalized_magnet_changes():.2f}"
         )
+
+        score = (
+            df["final_mae"] / 4_000
+            + df["steps_to_convergence"] / 150
+            + df["sum_of_normalized_magnet_changes"] / (5 * 150)
+        )
+        print("--------------------")
+        print(f"Score: {score.mean():.4f}")

@@ -5,10 +5,9 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import scienceplots  # noqa: F401
+import wandb
 import yaml
 from stable_baselines3.common.callbacks import BaseCallback
-
-import wandb
 
 plt.style.use(["science", "nature", "no-latex"])
 

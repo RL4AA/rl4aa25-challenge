@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 import subprocess
+import sys
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -9,19 +11,35 @@ from typing import Any, Dict, Optional, Tuple
 import gymnasium as gym
 import numpy as np
 import torch
-from cheetah.utils.segment_3d_builder import Segment3DBuilder
+from dotenv import load_dotenv
 from gymnasium import Wrapper
 
-from beam_3d_visualizer.beam_server.websocket_wrapper import WebSocketWrapper
+from src.render_3d.beam_server.segment_3d_builder import Segment3DBuilder
+from src.render_3d.beam_server.websocket_wrapper import WebSocketWrapper
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+# Calculate the path to the .env file, one levels up from the script's location
+script_dir = Path(__file__).resolve().parent  # Directory of the current script
+env_path = script_dir.parent / ".env"  # Two levels up to beam_3d_visualizer/.env
+
+# Load the .env file
+load_dotenv(dotenv_path=env_path)
+
+# Set logging level based on environment
+debug_mode = os.getenv("DEBUG_MODE", "False").lower() == "true"
+
+# Setup logging with conditional log level
+log_level = (
+    logging.DEBUG if debug_mode else logging.WARNING
+)  # Set to WARNING to suppress info/debug logs
+logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
+logger.info(f"Loaded .env from {env_path}")
+logger.info(f"NODE_ENV: {os.getenv('NODE_ENV')}")
+logger.info(f"VITE_FRONTEND_PORT: {os.getenv('VITE_FRONTEND_PORT')}")
+
 # Define constants at module level
-DEFAULT_HTTP_HOST = "localhost"
+DEFAULT_HTTP_HOST = "127.0.0.1"
 DEFAULT_HTTP_PORT = 5173
 DEFAULT_NUM_PARTICLES = 1000
 BEAM_SOURCE_COMPONENT = "AREASOLA1"
@@ -78,7 +96,10 @@ class BeamVisualizationWrapper(Wrapper):
         self.incoming_particle_beam = None
         self.last_action = np.zeros(5, dtype=np.float32)
 
-        # Start the JavaScript web application
+        # Ensures the necessary npm dependencies are installed
+        self._setup()
+
+        # Start the JavaScript web application (dev or prod mode)
         self._start_web_application()
 
         # Set up 3D visualization
@@ -246,7 +267,7 @@ class BeamVisualizationWrapper(Wrapper):
             )
 
         # Log the initial beam state for debugging
-        logger.debug(
+        logger.info(
             f"Initialized incoming particle beam with {self.num_particles} particles."
         )
 
@@ -277,6 +298,8 @@ class BeamVisualizationWrapper(Wrapper):
         # Run simulation
         self._simulate()
 
+        info.update({"stop_simulation": self.data["stop_simulation"]})
+
         return observation, reward, terminated, truncated, info
 
     async def render(self):
@@ -292,15 +315,12 @@ class BeamVisualizationWrapper(Wrapper):
         if self.render_mode != "human":
             return  # Skip rendering if not in human mode
 
-        # Update WebSocket broadcasting data
-        self.env.data = self.data
-
-        # Delegate to WebSocketWrapper for broadcasting
+        # Delegate to WebSocketWrapper for broadcasting the data
         await self.env.broadcast(self.data)
 
         # Add delay after broadcasting to allow animation to complete
         # before sending new data
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(1.25)
 
     def close(self):
         """
@@ -333,6 +353,50 @@ class BeamVisualizationWrapper(Wrapper):
         """
         return np.array(self.screen.resolution) / 2 * np.array(self.screen.pixel_size)
 
+    def _setup(self):
+        """
+        Automates the setup process by running npm install to install dependencies.
+        This should be run once to ensure the JavaScript dependencies are installed.
+        """
+        try:
+            # Path to the node_modules directory
+            node_modules_path = os.path.join(self.base_path.parent, "node_modules")
+
+            # Check if package.json exists to confirm we are in the correct directory
+            package_json_path = os.path.join(self.base_path.parent, "package.json")
+            if not os.path.exists(package_json_path):
+                raise FileNotFoundError(
+                    f"{package_json_path} not found."
+                    f" Make sure you are in the correct project directory."
+                )
+
+            # Check if node_modules exists and is not empty
+            if os.path.exists(node_modules_path) and os.listdir(node_modules_path):
+                logger.info("Dependencies are already installed. Skipping npm install.")
+            else:
+                logger.info("Running npm install...")
+                result = subprocess.run(
+                    ["npm", "install"],
+                    cwd=self.base_path.parent,  # Run in directory with package.json
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    shell=(
+                        True if sys.platform == "win32" else None
+                    ),  # Only use shell=True on Windows
+                )
+
+                # Log the output for debugging purposes
+                if result.returncode == 0:
+                    logger.info("npm install completed successfully.")
+                else:
+                    logger.error(f"npm install failed with error: {result.stderr}")
+                    raise RuntimeError(f"npm install failed: {result.stderr}")
+
+        except Exception as e:
+            logger.error(f"Error during setup: {e}")
+            raise
+
     def _start_web_application(self):
         """
         Start the JavaScript web application (Vite development server)
@@ -341,26 +405,62 @@ class BeamVisualizationWrapper(Wrapper):
 
         def run_web_server():
             try:
-                # Start Vite development server
-                cmd = [
-                    "npx",
-                    "vite",
-                    "--host",
-                    self.http_host,
-                    "--port",
-                    str(self.http_port),
-                ]
+                # Determine the mode and load the appropriate .env file
+                node_env = os.getenv("NODE_ENV", "production")
+                if node_env == "production":
+                    env_file = script_dir.parent / ".env.production"
+                    # Load with override existing vars to ensure latest values
+                    load_dotenv(
+                        dotenv_path=env_file,
+                        override=True,
+                    )
+
+                logger.debug(f"Running in mode: {node_env}")
+
+                if node_env == "development":
+                    # Development mode: Start Vite dev server
+                    # Start Vite development server
+                    cmd = [
+                        "npx",
+                        "vite",
+                        "--host",
+                        self.http_host,
+                        "--port",
+                        str(self.http_port),
+                    ]
+                    logger.debug(
+                        f"Starting Vite dev server"
+                        f" on http://{self.http_host}:{self.http_port}"
+                    )
+                else:
+                    # Production mode: Start Express server (server.js)
+                    dist_path = self.base_path.parent / "dist"
+                    if not dist_path.exists():
+                        raise FileNotFoundError(
+                            f"Pre-built dist folder not found at {dist_path}"
+                        )
+                    cmd = ["node", "server.js"]
+                    logger.debug(
+                        f"Starting Express server (server.js)"
+                        f" on http://{self.http_host}:{self.http_port}"
+                    )
+
                 self.web_process = subprocess.Popen(
                     cmd,
                     cwd=self.base_path.parent,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    # Pass environment variables (e.g., PORT from .env)
+                    env=os.environ.copy(),
+                    shell=(
+                        True if sys.platform == "win32" else None
+                    ),  # Only use shell=True on Windows
                 )
 
                 # Log output for debugging
                 for line in self.web_process.stdout:
-                    logger.info(f"Vite stdout: {line.strip()}")
+                    logger.debug(f"Vite stdout: {line.strip()}")
                 for line in self.web_process.stderr:
                     logger.error(f"Vite stderr: {line.strip()}")
 
@@ -373,8 +473,8 @@ class BeamVisualizationWrapper(Wrapper):
         self.web_thread.start()
 
         # Give the server a moment to start
-        logger.info(
-            f"Started JavaScript web application on "
+        logger.debug(
+            f"JavaScript web application setup initiated on "
             f"http://{self.http_host}:{self.http_port}"
         )
 
@@ -404,9 +504,7 @@ class BeamVisualizationWrapper(Wrapper):
             outgoing_beam = element.track(references[-1])
             references.append(outgoing_beam)
 
-            logger.debug(
-                f"Tracked beam through element {element.name}: {outgoing_beam}"
-            )
+            logger.info(f"Tracked beam through element {element.name}: {outgoing_beam}")
 
             # Only store particle positions for elements in lattice_component_positions
             if element.name in self.lattice_component_positions:
@@ -495,6 +593,7 @@ class BeamVisualizationWrapper(Wrapper):
             {
                 "screen_reading": self.screen_reading.tolist(),
                 "bunch_count": self.current_step,
+                "stop_simulation": self.env.stop_simulation,
             }
         )
 

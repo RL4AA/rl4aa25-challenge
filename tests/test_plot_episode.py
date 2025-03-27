@@ -6,8 +6,6 @@ from stable_baselines3.common.env_util import unwrap_wrapper
 from src.environments import ea
 from src.wrappers import PlotEpisode
 
-# TODO Test that episode trigger behaves like RecordVideo
-
 
 @pytest.mark.parametrize("section", [pytest.param(ea, marks=pytest.mark.ea)])
 @pytest.mark.parametrize("generate_screen_images", [True, False])

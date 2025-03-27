@@ -4,3 +4,5 @@ log
 models
 plots
 wandb
+
+.DS_Store

@@ -1,8 +1,7 @@
 import gymnasium as gym
 import numpy as np
-from gymnasium import logger
-
 import wandb
+from gymnasium import logger
 
 from ..eval import Episode
 

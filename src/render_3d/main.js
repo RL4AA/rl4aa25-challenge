@@ -45,6 +45,9 @@ class SceneManager {
         this.isSceneReady = false;            // Flag to track whether the scene is fully loaded and ready
         this.newDataAvailable = false;        // Flag to track if new data has been received from the WebSocket
 
+        // Initialize stop button state (False by default)
+        this.stopState = false;
+
         // Particle System Properties
         this.particleCount = 1000;      // The total number of particles to be simulated, matching the Python code
         this.particles = [];            // Array to hold all particle instances for the simulation
@@ -278,16 +281,17 @@ class SceneManager {
         panel.style.top = '20px';
         panel.style.left = '20px';
         panel.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        panel.style.padding = '10px';
+        panel.style.padding = '6px';
         panel.style.borderRadius = '5px';
         panel.style.zIndex = '101';
         panel.style.color = '#fff';
         panel.style.fontFamily = 'Arial, sans-serif';
         panel.style.fontSize = '12px';
+        panel.style.width = '200px';
 
         // Control panel title
         const title = document.createElement('h3');
-        title.textContent = 'Control Panel: Magnet Strength & Steering Angles';
+        title.textContent = 'Control Panel';
         title.style.margin = '0 0 10px 0';
         title.style.fontSize = '14px';
         title.style.textAlign = 'center';
@@ -296,8 +300,8 @@ class SceneManager {
         // Define the controls and their properties
         // Note: Although five controls are defined here, your gym observation space is (4,). Adjust as needed.
         const controls = [
-            { id: 'AREAMQZM1', type: 'k1', label: 'AREAMQZM1', min: -72, max: 72, step: 1.0, initial: 0 },
-            { id: 'AREAMQZM2', type: 'k1', label: 'AREAMQZM2', min: -72, max: 72, step: 1.0, initial: 0 },
+            { id: 'AREAMQZM1', type: 'k1', label: 'AREAMQZM1', min: -72, max: 72, step: 0.01, initial: 0 },
+            { id: 'AREAMQZM2', type: 'k1', label: 'AREAMQZM2', min: -72, max: 72, step: 0.01, initial: 0 },
             { id: 'AREAMCVM1', type: 'angle', label: 'AREAMCVM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
             { id: 'AREAMQZM3', type: 'k1', label: 'AREAMQZM3', min: -72, max: 72, step: 0.01, initial: 0 },
             { id: 'AREAMCHM1', type: 'angle', label: 'AREAMCHM1', min: -6.1782e-3, max: 6.1782e-3, step: 0.000123564, initial: 0.0 },
@@ -312,6 +316,7 @@ class SceneManager {
         controls.forEach(control => {
             const container = document.createElement('div');
             container.style.marginBottom = '8px';
+            container.style.width = '100%'; // Ensure consistent width within the panel
 
             const label = document.createElement('label');
             label.textContent = control.label;
@@ -328,17 +333,26 @@ class SceneManager {
             input.value = control.initial;
             input.style.width = '150px';
 
-            // Display current value
+            // Display current value with fixed width
             const valueDisplay = document.createElement('span');
             valueDisplay.id = `${control.id}-value`;
             valueDisplay.textContent = control.initial;
-            valueDisplay.style.marginLeft = '8px';
+            valueDisplay.style.marginLeft = '11px';
+            valueDisplay.style.display = 'inline-block'; // Prevent width changes
+            valueDisplay.style.minWidth = '10px';        // Ensure fixed width
+            valueDisplay.style.textAlign = 'left';       // Align numbers neatly
 
             // Store default value
             this.defaultValues[control.id] = control.initial;
 
             input.addEventListener('input', () => {
-                valueDisplay.textContent = input.value;
+                let displayValue = input.value;
+                if (control.id === 'AREAMCVM1' || control.id === 'AREAMCHM1') {
+                    displayValue = this.radToMrad(parseFloat(input.value)).toFixed(2);
+                    valueDisplay.textContent = displayValue;
+                } else {
+                    valueDisplay.textContent = displayValue;
+                }
                 this.updateControls(control.id);
             });
 
@@ -354,14 +368,18 @@ class SceneManager {
         const resetButton = document.createElement('button');
         resetButton.textContent = 'Reset';
         resetButton.style.marginTop = '10px';
-        resetButton.style.width = '50%';
-        resetButton.style.padding = '5px';
+        resetButton.style.width = '40px'; // '50%'
+        resetButton.style.height = '40px'; // Set the same height for a circle
+        resetButton.style.padding = '0'; // No extra padding (prev '5px')
         resetButton.style.border = 'none';
-        resetButton.style.borderRadius = '3px';
+        resetButton.style.borderRadius = '50%'; // Make it a circle (prev '3px')
+        resetButton.style.display = 'flex'; // Ensure text is centered
+        resetButton.style.alignItems = 'center';
+        resetButton.style.justifyContent = 'center';
         resetButton.style.cursor = 'pointer';
         resetButton.style.backgroundColor = '#4885a8';
         resetButton.style.color = '#fff';
-        resetButton.style.fontSize = '12px';
+        resetButton.style.fontSize = '10px'; // '12px'
 
         // Reset function
         resetButton.addEventListener('click', () => {
@@ -373,7 +391,69 @@ class SceneManager {
             this.updateControls();
         });
 
-        panel.appendChild(resetButton);
+        // Create Stop button
+        const stopButton = document.createElement('button');
+        stopButton.textContent = 'Stop';
+        stopButton.style.width = '40px';
+        stopButton.style.height = '40px';
+        stopButton.style.borderRadius = '50%';
+        stopButton.style.display = 'flex';
+        stopButton.style.alignItems = 'center';
+        stopButton.style.justifyContent = 'center';
+        stopButton.style.fontSize = '12px';
+        stopButton.style.backgroundColor = 'red';
+        stopButton.style.color = '#fff';
+        stopButton.style.border = 'none';
+        stopButton.style.cursor = 'pointer';
+
+        stopButton.addEventListener('click', () => {
+            this.stopState = !this.stopState;  // Toggle between True/False
+            stopButton.style.backgroundColor = this.stopState ? 'darkred' : 'red'; // Indicate state change
+
+            // Send updated value over WebSocket
+            this.updateControls();
+        });
+
+        // Common button styles
+        const buttonStyle = {
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',  // Ensure same font size
+            padding: '0',
+            margin: '0',        // Remove margin inconsistencies
+            lineHeight: '1',    // Normalize text height inside buttons
+            border: 'none',
+            cursor: 'pointer',
+        };
+
+        // Apply styles to Reset button
+        Object.assign(resetButton.style, buttonStyle);
+        resetButton.style.backgroundColor = '#4885a8';
+        resetButton.style.color = '#fff';
+
+        // Apply styles to Stop button
+        Object.assign(stopButton.style, buttonStyle);
+        stopButton.style.backgroundColor = 'red';
+        stopButton.style.color = '#fff';
+
+        // Create button container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.style.marginTop = '10px';
+        buttonContainer.style.justifyContent = 'center'; // Aligns buttons to the left
+        buttonContainer.style.width = '50%';
+
+        // Append buttons to the button container
+        buttonContainer.appendChild(resetButton);
+        buttonContainer.appendChild(stopButton);
+
+        // Append button container to the control panel
+        panel.appendChild(buttonContainer);
 
         // Append the control panel to the container
         const containerEl = document.getElementById('container3D');
@@ -389,12 +469,14 @@ class SceneManager {
         plotWindow.style.position = 'fixed';
         plotWindow.style.top = '10px';
         plotWindow.style.right = '10px';
-        plotWindow.style.width = '400px';
-        plotWindow.style.height = '300px';
+        plotWindow.style.width = '300px';   // Default: 400px
+        plotWindow.style.height = '210px';  // Default: 300px
         plotWindow.style.backgroundColor = 'white';
         plotWindow.style.border = '2px solid black';
         plotWindow.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
         plotWindow.style.padding = '10px';
+        plotWindow.style.border = 'none'; // Ensure no border
+        plotWindow.style.backgroundColor = 'black'; // Match background color if needed
         plotWindow.style.zIndex = '1000';
 
         // Create the container for the plot
@@ -443,30 +525,38 @@ class SceneManager {
         // Define initial layout with an empty plot with labels and grid
         const layout = {
             title: {
-                text: "Particle Beam (bunch count: 0)", // Placeholder title
+                text: "Camera Image", // Placeholder title
                 font: { family: 'Arial, sans-serif', size: 16, color: 'white' },
                 x: 0.5
             },
             xaxis: {
-                title: { text: 'X position (mm)', font: { size: 14, color: 'white' } },
+                title: {
+                    text: '', // 'X position (mm)',
+                    font: { size: 14, color: 'white' }
+                },
                 range: [-4, 4],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
+                visible: true,   // Optional: Hide axis
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
-             },
+            },
             yaxis: {
-                title: { text: 'Y position (mm)', font: { size: 14, color: 'black' } },
+                title: {
+                    text: '', // 'Y position (mm)',
+                    font: { size: 14, color: 'black' }
+                },
                 range: [-2, 2],  // Default range, will be updated dynamically
                 showgrid: true,
                 zeroline: false,
+                visible: true,   // Optional: Hide axis
                 tickfont: { color: 'white' },
                 gridcolor: 'white'
             },
-            margin: { l: 100, r: 20, t: 40 , b: 50 },
+            margin: { l: 30, r: 0, t: 40 , b: 30 },
             autosize: true,
             paper_bgcolor: 'black',  // Background outside the plot area
-            plot_bgcolor: 'black'  // Keep graph area transparen
+            plot_bgcolor: 'black'    // Keep graph area transparen
         };
 
         // Initialize an empty heatmap trace to prevent layout conflicts
@@ -476,8 +566,7 @@ class SceneManager {
             y: [...Array(510).keys()],  // Row indices from 0 to 509 (y-axis)
             type: 'heatmap',
             colorscale: 'Viridis',
-            showscale: true,  // Do not include the color scale
-            //colorbar: { title: 'Bunch Count' }
+            showscale: false,  // Do not include the color scale
         };
 
         // Initialize an empty plot with the defined layout
@@ -514,8 +603,7 @@ class SceneManager {
             y: yValues,
             type: 'heatmap',
             colorscale: 'Viridis',  // Use the 'Hot' colorscale for warm hues at high counts, alternatively,'Viridis'
-            showscale: true,  // Remove the color scale
-            //colorbar: { title: 'Bunch Count' }
+            showscale: false,  // Remove the color scale
         };
 
         // Retrieve the current zoom state before updating
@@ -524,7 +612,7 @@ class SceneManager {
         // If the user has zoomed in, preserve their zoom level
         const layout = {
             title: {
-                text: `Particle Beam (bunch count: ${this.currentData.bunch_count})`,
+                text: `Camera Image`,
                 font: {
                     family: 'Arial, sans-serif',
                     size: 16,
@@ -535,7 +623,7 @@ class SceneManager {
             },
             xaxis: {
                 title: {
-                    text: 'X position (mm)',
+                    text: '', // 'X position (mm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -544,13 +632,14 @@ class SceneManager {
                 },
                 range: currentLayout ? currentLayout.xaxis.range : [xMin, xMax],  // Preserve zoom
                 showgrid: true,
-                zeroline: false, //true
+                zeroline: false, // true
+                visible: true,   // Optional: Hide axis
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
             },
             yaxis: {
                 title: {
-                    text: 'Y position (mm)',
+                    text: '', // 'Y position (mm)',
                     font: {
                         family: 'Arial, sans-serif',
                         size: 14,
@@ -560,12 +649,13 @@ class SceneManager {
                 },
                 range: currentLayout ? currentLayout.yaxis.range : [yMin, yMax],  // Preserve zoom
                 showgrid: true,
-                zeroline: false, //true
+                zeroline: false, // true
+                visible: true,   // Optional: Hide axis
                 scaleanchor: 'x', // Ensures equal aspect ratio
                 tickfont: { color: 'white' },  // White tick labels
                 gridcolor: 'white'  // Optional: Dim grid lines for better visibility
             },
-            margin: { l: 100, r: 30, t: 40 , b: 50 },
+            margin: { l: 30, r: 0, t: 40 , b: 30 },
             autosize: true,
             paper_bgcolor: 'black',  // Background outside the plot area
             plot_bgcolor: 'black'  // Keep graph area transparent
@@ -697,6 +787,10 @@ class SceneManager {
             }
         });
         return foundObject;
+    }
+
+    radToMrad(rad) {
+        return rad * 1000;
     }
 
     // Rendering & Animation
@@ -890,12 +984,13 @@ class SceneManager {
     getWebSocketUrl() {
         // Setup default fallback
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = 'localhost';
-        const port = '8081';
+
+        const host = import.meta.env.VITE_PROXY_HOST_NAME || '127.0.0.1';
+        const port = import.meta.env.VITE_BACKEND_PORT || '8081';
 
         // Use the environment variable if available, otherwise fallback to a default
-        const wsUrl = import.meta.env.VITE_PYTHON_SERVER_URL || `${protocol}//${host}:${port}`;
-        console.debug('WebSocket URL from env:', wsUrl);
+        const wsUrl = import.meta.env.VITE_BACKEND_SERVER_URL || `${protocol}//${host}:${port}`;
+        console.log('WebSocket URL from env:', wsUrl); // Debug the value
 
         return wsUrl;
     }
@@ -1092,7 +1187,8 @@ class SceneManager {
             AREAMCHM1: parseFloat(this.controlSliders['AREAMCHM1'].value),
             particleSpeed: parseFloat(this.controlSliders['particleSpeed'].value),
             scaleBeamSpread: parseFloat(this.controlSliders['scaleBeamSpread'].value),
-            scaleBeamPosition: parseFloat(this.controlSliders['scaleBeamPosition'].value)
+            scaleBeamPosition: parseFloat(this.controlSliders['scaleBeamPosition'].value),
+            stopSimulation: this.stopState  // Include stop button state
         };
 
         // Always update particleSpeed to match the slider value
@@ -1102,7 +1198,9 @@ class SceneManager {
         if (changedControlId) {
             const slider = this.controlSliders[changedControlId];
 
-            if (changedControlId === 'particleSpeed') {
+            if (changedControlId === 'stopSimulation') {
+                controlValues[changedControlId] = newValue; // Directly assign the stop state
+            } else if (changedControlId === 'particleSpeed') {
                 // Update particleSpeed directly when its slider changes
                 this.particleSpeed = parseFloat(slider.value);
             } else if (changedControlId === 'AREAMCVM1' || changedControlId === 'AREAMCHM1') {

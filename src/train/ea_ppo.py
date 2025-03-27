@@ -3,6 +3,7 @@ from functools import partial
 import gymnasium as gym
 import numpy as np
 import torch.nn as nn
+import wandb
 from gymnasium.wrappers import (
     FlattenObservation,
     FrameStack,
@@ -16,8 +17,6 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from wandb.integration.sb3 import WandbCallback
-
-import wandb
 
 from ..environments import ea
 from ..utils import save_config
@@ -110,9 +109,7 @@ def train(config: dict) -> None:
         )
     elif config["vec_env"] == "subproc":
         vec_env = SubprocVecEnv(
-            [
-                partial(make_env, config) for _ in range(config["n_envs"])
-            ],  # TODO: Might need to be "fork" for Maxwell to terminate properly
+            [partial(make_env, config) for _ in range(config["n_envs"])]
         )
     else:
         raise ValueError(f"Invalid value \"{config['vec_env']}\" for dummy")
