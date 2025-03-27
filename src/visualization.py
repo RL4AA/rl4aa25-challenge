@@ -5,7 +5,6 @@ from typing import Optional
 import cv2
 import gymnasium as gym
 import ipywidgets as widgets
-import matplotlib.pyplot as plt
 from IPython.display import display
 
 from src.environments import ea
@@ -36,6 +35,7 @@ async def run_simulation_async(
 
         # Check if we have a new control action from WebSocket
         if env.control_action is not None:
+            print(f"New action received: {env.control_action}")
             env.last_action = env.control_action  # Update last_action with new action
             env.control_action = None  # Clear after use
 
@@ -129,6 +129,9 @@ def restart_manual_tuning(env: gym.Env):
     done_button = widgets.Button(description="Done!")
     done_button.on_click(lambda _: on_done_button_clicked())
 
+    # Output widget for displaying the final figure
+    output_fig = widgets.Output()
+
     bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     _, buffer = cv2.imencode(".png", bgr)
     screen_image_widget = widgets.Image(
@@ -155,11 +158,15 @@ def restart_manual_tuning(env: gym.Env):
     def on_done_button_clicked():
         for w in magnet_widgets:
             w.close()
-        screen_image_widget.close()
+
         done_button.close()
-        # Show the iamge one last time
-        _ = env.generate_episode_plot()
-        plt.show()
+
+        screen_image_widget.close()
+        # Display the figure inside the Output widget
+        with output_fig:
+            output_fig.clear_output(wait=True)
+            fig = env.generate_episode_plot()
+            display(fig)
         env.reset()
 
-    display(*magnet_widgets, screen_image_widget, done_button)
+    display(*magnet_widgets, screen_image_widget, done_button, output_fig)
