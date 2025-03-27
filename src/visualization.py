@@ -36,7 +36,6 @@ async def run_simulation_async(
 
         # Check if we have a new control action from WebSocket
         if env.control_action is not None:
-            print(f"New action received: {env.control_action}")
             env.last_action = env.control_action  # Update last_action with new action
             env.control_action = None  # Clear after use
 
