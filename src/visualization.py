@@ -102,7 +102,7 @@ def restart_manual_tuning(env: gym.Env):
     observation, info = env.reset()
 
     # magnet_names = info["magnet_names"]
-    magnet_names = ["Q1", "Q2", "Cor_V", "Q3", "Cor_H"]
+    magnet_names = ["Q1", "Q2", "CV", "Q3", "CH"]
     magnet_mins = env.observation_space["magnets"].low
     magnet_maxs = env.observation_space["magnets"].high
     current_magnet_settings = observation["magnets"]
