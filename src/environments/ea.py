@@ -306,6 +306,7 @@ class TransverseTuning(gym.Env):
             "beam_reward": self._beam_reward,
             "on_screen_reward": self._on_screen_reward,
             "magnet_change_reward": self._magnet_change_reward,
+            "max_quad_setting": self.observation_space["magnets"].high[0],
             "backend_info": self.backend.get_info(),  # Info specific to the backend
         }
 

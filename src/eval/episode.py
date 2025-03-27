@@ -6,10 +6,12 @@ from itertools import product
 from pathlib import Path
 from typing import Literal, Optional, Union
 
+import cheetah
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import scienceplots  # noqa: F401
+import torch
 from scipy.ndimage import uniform_filter
 
 from ..environments.ea import TransverseTuning
@@ -598,9 +600,11 @@ class Episode:
             marker_position, marker_label = vertical_marker
             ax.axvline(marker_position, label=marker_label, ls=":", color="grey")
 
+        max_quad_setting = self.infos[0]["max_quad_setting"]
+
         if normalize:
             for name, history, color in zip(names, all_histories.T, palette_colors):
-                ax.plot(history / 72.0, c=color, label=name, ls="-")
+                ax.plot(history / max_quad_setting, c=color, label=name, ls="-")
             ax.set_xlim(0, None)
             ax.set_ylim(-1.1, 1.1)
             if legend:
@@ -613,7 +617,9 @@ class Episode:
             for name, history, color in zip(names, all_histories.T, palette_colors):
                 ax.plot(history, c=color, label=name, ls="-")
             ax.set_xlim(0, None)
-            ax.set_ylim(-72 * 1.1, 72 * 1.1)  # Limits + 10% margin
+            ax.set_ylim(
+                -max_quad_setting * 1.1, max_quad_setting * 1.1
+            )  # Limits + 10% margin
             if legend:
                 ax.legend(loc="upper right", ncol=len(names))
 
@@ -753,6 +759,7 @@ class Episode:
         title: Optional[str] = None,
         figsize: tuple[float, float] = (510 / 72.72 * 1.9, 510 / 72.72 * 1.205 * 0.45),
         show_domain_randomisation_and_rewards: bool = False,
+        fake_screen_images: bool = True,
         save_path: Optional[str] = None,
     ) -> matplotlib.figure.Figure:
         """Summary plot of important data about this episode."""
@@ -802,6 +809,7 @@ class Episode:
             mode="mu",
             legend=True,
             title="Beam parameters",
+            limit_to_screen=False,
         )
 
         self.plot_beam_parameters(
@@ -810,6 +818,7 @@ class Episode:
             ylabel=True,
             mode="sigma",
             legend=True,
+            limit_to_screen=False,
         )
 
         #############
@@ -834,6 +843,58 @@ class Episode:
                 xlabel=True,
                 ylabel=True,
             )
+        elif fake_screen_images:
+            fake_screen = cheetah.Screen(
+                resolution=(
+                    int(self.infos[0]["screen_resolution"][0]),
+                    int(self.infos[0]["screen_resolution"][1]),
+                ),
+                pixel_size=torch.tensor(self.infos[0]["pixel_size"]),
+                is_active=True,
+            )
+
+            fake_beam_before = cheetah.ParameterBeam.from_parameters(
+                mu_x=torch.tensor(self.beam_parameters_before()[0]),
+                sigma_x=torch.tensor(self.beam_parameters_before()[1]),
+                mu_y=torch.tensor(self.beam_parameters_before()[2]),
+                sigma_y=torch.tensor(self.beam_parameters_before()[3]),
+            )
+            _ = fake_screen.track(fake_beam_before)
+            fake_screen_image_before = fake_screen.reading.numpy()
+
+            fake_beam_after = cheetah.ParameterBeam.from_parameters(
+                mu_x=torch.tensor(self.beam_parameters_after()[0]),
+                sigma_x=torch.tensor(self.beam_parameters_after()[1]),
+                mu_y=torch.tensor(self.beam_parameters_after()[2]),
+                sigma_y=torch.tensor(self.beam_parameters_after()[3]),
+            )
+            _ = fake_screen.track(fake_beam_after)
+            fake_screen_image_after = fake_screen.reading.numpy()
+
+            fake_screen_image_shared_vmax = max(
+                fake_screen_image_before.max(), fake_screen_image_after.max()
+            )
+
+            plot_screen_image(
+                image=fake_screen_image_before,
+                resolution=self.infos[0]["screen_resolution"],
+                pixel_size=self.infos[0]["pixel_size"],
+                ax=ax_before,
+                vmax=fake_screen_image_shared_vmax,
+                xlabel=False,
+                ylabel=True,
+                title="Screen images",
+            )
+            plot_screen_image(
+                image=fake_screen_image_after,
+                resolution=self.infos[-1]["screen_resolution"],
+                pixel_size=self.infos[-1]["pixel_size"],
+                ax=ax_after,
+                vmax=fake_screen_image_shared_vmax,
+                xlabel=True,
+                ylabel=True,
+            )
+
         plot_beam_parameters_on_screen(
             mu_x=self.target_beam_parameters()[0],
             sigma_x=self.target_beam_parameters()[1],
