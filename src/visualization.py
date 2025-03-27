@@ -161,5 +161,6 @@ def restart_manual_tuning(env: gym.Env):
         # Show the iamge one last time
         _ = env.generate_episode_plot()
         plt.show()
+        env.reset()
 
     display(*magnet_widgets, screen_image_widget, done_button)
