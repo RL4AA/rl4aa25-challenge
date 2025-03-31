@@ -1,0 +1,52 @@
+ID,Name,Email Address,Affiliation,Rate your RL experience (On an increasing scale of 1-5),Rate your coding experience (On an increasing scale of 1-5),Do you want to take part in the RL challenge?,Registration state,sex,group
+32,Joel Wulff,joel.wulff@cern.ch,CERN,4.0,4.0,Yes,Completed,male,1
+29,Simon Hirlaender,simon.hirlaender@plus.ac.at,PLUS University Salzburg,5.0,5.0,Yes,Completed,male,1
+79,Julian Gethmann,julian.gethmann@kit.edu,KIT,1.0,5.0,Yes,Completed,male,1
+63,Auralee Edelen,edelen@slac.stanford.edu,SLAC,4.0,4.0,Yes,Completed,unknown,1
+23,Sebastian Starke,s.starke@hzdr.de,HZDR,1.0,4.0,Yes,Completed,male,1
+24,Till Korten,t.korten@hzdr.de,Helmholtz Zentrum Dresden Rossendorf,1.0,4.0,Yes,Completed,male,1
+18,Lewis Boulton,lewis.boulton@desy.de,DESY,1.0,4.0,Yes,Withdrawn,male,1
+62,Sabrina Pochaba,sabrina.pochaba@salzburgresearch.at,Salzburg Research,4.0,3.0,Yes,Completed,female,1
+92,Adrián Menor de Oñate,adrian.menor.de.onate@cern.ch,CERN,3.0,3.0,Yes,Completed,male,1
+19,Olga Mironova,olga.mironova@plus.ac.at,University of Salzburg,3.0,2.0,Yes,Completed,female,1
+60,Bindu Sharan,bindu.sharan@desy.de,Deutsches Elektronen-Synchrotron (DESY),1.0,1.0,Yes,Completed,female,1
+7,Lata Sharan,sharanlata132@gmail.com,,4.0,3.0,Yes,Completed,female,2
+15,Leander Grech,leander.grech@um.edu.mt,University of Malta,4.0,5.0,Yes,Completed,male,2
+27,Penny Madysa,n.madysa@gsi.de,GSI Helmholtzzentrum für Schwerionenforschung,3.0,5.0,Yes,Completed,female,2
+25,Mohammad Sule Maidawa,mohd.maidawa10@gmail.com,Universite Paris-Est Creteil,1.0,5.0,Yes,Completed,male,2
+28,Eya Dammak,eya.dammak@ikmail.com,Desy,1.0,4.0,Yes,Completed,unknown,2
+74,Konrad Altenmüller,kaltenmueller@essbilbao.org,ESS-BILBAO,1.0,4.0,Yes,Completed,male,2
+51,Jason St. John,stjohn@fnal.gov,Fermilab,2.0,4.0,Yes,Completed,male,2
+38,Thorsten Hellert,thellert@lbl.gov,LBNL,2.0,3.0,Yes,Completed,male,2
+49,Gesa Goetzke,gesa.goetzke@posteo.de,DESY FLASH-D,1.0,3.0,Yes,Completed,female,2
+45,Nicholas Tedjosantoso,nicholas.tedjosantoso@haw-hamburg.de,HAW Hamburg,1.0,2.0,Yes,Completed,male,2
+8,Henry Day-Hall,henry.day-hall@desy.de,DESY,4.0,5.0,Yes,Completed,male,3
+43,Randeer Pratap Gautam,randeer.pratap.gautam@desy.de,Universität Siegen,2.0,5.0,Yes,Completed,unknown,3
+65,Amelia Pollard,amelia.pollard@stfc.ac.uk,ASTeC,2.0,5.0,Yes,Completed,female,3
+33,Borja Rodriguez Mateos,borja.rodriguez.mateos@cern.ch,CERN,4.0,4.0,Yes,Completed,male,3
+54,Pardis Niknejadi,pardis.niknejadi@desy.de,DESY,2.0,4.0,Yes,Completed,female,3
+90,Andre Dehne,andre.dehne@haw-hamburg.de,HAW Hamburg,2.0,4.0,Yes,Completed,male,3
+3,Farzad Jafarinia,fj.gups@gmail.com,"DESY, MXL",2.0,4.0,Yes,Completed,male,3
+20,Hannes Voß,hannes.voss@haw-hamburg.de,,2.0,3.0,Yes,Completed,male,3
+52,Xueting Wu,xueting.wu@ustc.edu.cn,USTC,2.0,3.0,Yes,Completed,unknown,3
+55,Stefano Krecic,stefano.krecic@elettra.eu,Elettra SInctrotrone Trieste,1.0,1.0,Yes,Completed,male,3
+4,Andrea Santamaria Garcia,ansantam@liverpool.ac.uk,University of Liverpool and Cockcroft Institute,5.0,5.0,Yes,Completed,female,4
+22,Gerhard Hejc,gerhard.hejc@googlemail.com,,2.0,5.0,Yes,Completed,male,4
+13,Ibon Bustinduy,ibustinduy@essbilbao.org,ESS-BILBAO,2.0,5.0,Yes,Completed,male,4
+21,M Asif Hasan,hasana@informatik.uni-freiburg.de,University of Freiburg,4.0,4.0,Yes,Completed,unknown,4
+50,Chandra Mohan Jagadeesan,chandra.mohan.jagadeesan@rwth-aachen.de,,3.0,4.0,Yes,Withdrawn,mostly_male,4
+91,Hayg GULER,hayg.guler@ijclab.in2p3.fr,"IJCLab, Orsay, France",3.0,4.0,Yes,Completed,unknown,4
+6,Parth Patil,parth.patil@studium.uni-hamburg.de,University of Hamburg,3.0,4.0,Yes,Completed,unknown,4
+73,Amna Majid,amna.majid@xfel.eu,"EuXFEL, DASHH",1.0,3.0,Yes,Completed,unknown,4
+56,Francesco Tripaldi,francesco.tripaldi@elettra.eu,Elettra Sincrotrone Trieste,1.0,2.0,Yes,Completed,male,4
+26,Matthew Schwab,matthew.schwab@uni-jena.de,FSU Jena,2.0,2.0,Yes,Completed,male,4
+44,Juan Manuel Montoya Bayardo,juan.montoya-bayardo@stud.sbg.ac.at,University Salzburg,4.0,4.0,Yes,Withdrawn,male,5
+75,Juan Luis Muñoz,jlmunoz@essbilbao.org,ESS-Bilbao,2.0,5.0,Yes,Completed,male,5
+36,Marco Bocchio,m.bocchio@transmutex.com,Transmutex,1.0,5.0,Yes,Completed,male,5
+2,Chenran Xu,chenran.xu@kit.edu,KIT,4.0,4.0,Yes,Completed,unknown,5
+16,Ferdinand Ferber,ferdinand-ferber@posteo.de,University of Salzburg,1.0,4.0,Yes,Completed,male,5
+61,Seyedeh Nasrin Mohammadi,s.mohammadi@fz-juelich.de,,2.0,4.0,Yes,Completed,unknown,5
+68,Johan Leygonie,johan.leygonie@gmail.com,Paris Saclay Université,1.0,4.0,Yes,Completed,male,5
+66,Georg Schäfer,georg.schaefer@fh-salzburg.ac.at,Salzburg University of Applied Sciences,3.0,3.0,Yes,Completed,male,5
+12,Muhammad Abdullah Malik,muhammad.malik@kit.edu,Karlsruhe Institute of echnology(KIT),2.0,3.0,Yes,Completed,male,5
+17,Lorenz Fischl,lfischl@pm.me,MedAustron,2.0,2.0,Yes,Completed,male,5
