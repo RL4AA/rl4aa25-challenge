@@ -49,7 +49,7 @@ gp_constraints:
   min_std_noise: 1.0e-20
   max_std_noise: 2.5e-2
   min_outputscale: 1.0e-20
-  max_outputscale: 100.0
+  max_outputscale: 10.0
   min_lengthscale: 1.0e-10
   max_lengthscale: 1000.0
   min_lengthscale_time: 0.01
@@ -66,7 +66,7 @@ controller:
   # length equals to the length of the action_space
   target_action_norm: [0.5, 0.5, 0.5, 0.5, 0.5]
   weight_action: [0.0, 0.0, 0.0, 0.0, 0.0]
-  len_horizon: 10
+  len_horizon: 5
   exploration_factor: 0.0
   limit_action_change: false
   max_change_action_norm: [0.5]
