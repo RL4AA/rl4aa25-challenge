@@ -1,7 +1,4 @@
-import os
-import time  # TODO Think about which of these are only used by one backend
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Literal, Optional, Union
 
 import cv2
@@ -9,16 +6,8 @@ import gymnasium as gym
 import numpy as np
 import torch
 from gymnasium import spaces
-from scipy.ndimage import minimum_filter1d, uniform_filter1d
 
-from ..reward import combiners, transforms
-from ..type_aliases import CombinerLiteral, TransformLiteral
 from .base_backend import TransverseTuningBaseBackend
-
-# TODO Pass incoming as Cheetah beam
-# TODO Make sure random seeds are used correctly (incoming, misalignments, etc.)
-# TODO Add reset option to generate beam images with Cheeath environment
-# TODO Faster dummy pydoocs
 
 
 class TransverseTuning(gym.Env):
@@ -46,6 +35,9 @@ class TransverseTuning(gym.Env):
     :param max_quad_delta: Limit of by how much quadrupole settings may be changed when
         `action_mode` is set to `"delta"`. This parameter is ignored when `action_mode`
         is set to `"direct"`.
+    :param max_steerer_setting: Maximum allowed steerer setting. The real steerers can
+        be set from -6.1782e-3 to 6.1782e-3. These limits are imposed by the power
+        supplies.
     :param max_steerer_delta: Limit of by how much steerer settings may be changed when
         `action_mode` is set to `"delta"`. This parameter is ignored when `action_mode`
         is set to `"direct"`.
@@ -64,56 +56,25 @@ class TransverseTuning(gym.Env):
         positive values. This might make learning or optimisation easier.
     :param clip_magnets: If `True`, magnet settings are clipped to their allowed ranges
         after each step.
-    :param beam_param_transform: Reward transform for the beam parameters. Can be
-        `"Linear"`, `"ClippedLinear"`, `"SoftPlus"`, `"NegExp"` or `"Sigmoid"`.
-    :param beam_param_combiner: Reward combiner for the beam parameters. Can be
-        `"Mean"`, `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or
-        `"SmoothMax"`.
-    :param beam_param_combiner_args: Arguments for the beam parameter combiner. NOTE
-        that these may be different for different combiners.
-    :param beam_param_combiner_weights: Weights for the beam parameter combiner.
-    :param magnet_change_transform: Reward transform for the magnet changes. Can be
-        `"Linear"`, `"ClippedLinear"`, `"SoftPlus"`, `"NegExp"` or `"Sigmoid"`.
-    :param magnet_change_combiner: Reward combiner for the magnet changes. Can be
-        `"Mean"`, `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or
-        `"SmoothMax"`.
-    :param magnet_change_combiner_args: Arguments for the magnet change combiner. NOTE
-        that these may be different for different combiners.
-    :param magnet_change_combiner_weights: Weights for the magnet change combiner.
-    :param final_combiner: Reward combiner for the final reward. Can be `"Mean"`,
-        `"Multiply"`, `"GeometricMean"`, `"Min"`, `"Max"`, `"LNorm"` or `"SmoothMax"`.
-    :param final_combiner_args: Arguments for the final combiner. NOTE that these may
-        be different for different combiners.
-    :param final_combiner_weights: Weights for the final combiner.
     """
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(
         self,
-        backend: Literal["cheetah", "doocs", "doocs_dummy"],
+        backend: Literal["cheetah"] = "cheetah",
         render_mode: Optional[Literal["human", "rgb_array"]] = None,
         action_mode: Literal["direct", "delta"] = "direct",
         magnet_init_mode: Optional[Union[Literal["random"], np.ndarray, list]] = None,
         max_quad_setting: float = 72.0,
         max_quad_delta: Optional[float] = None,
+        max_steerer_setting: float = 6.1782e-3,
         max_steerer_delta: Optional[float] = None,
         target_beam_mode: Union[Literal["random"], np.ndarray, list] = "random",
         target_threshold: Optional[Union[float, np.ndarray, list]] = None,
         threshold_hold: int = 1,
         unidirectional_quads: bool = False,
         clip_magnets: bool = True,
-        beam_param_transform: TransformLiteral = "Sigmoid",
-        beam_param_combiner: CombinerLiteral = "GeometricMean",
-        beam_param_combiner_args: dict = {},
-        beam_param_combiner_weights: list = [1, 1, 1, 1],
-        magnet_change_transform: TransformLiteral = "Sigmoid",
-        magnet_change_combiner: CombinerLiteral = "Mean",
-        magnet_change_combiner_args: dict = {},
-        magnet_change_combiner_weights: list = [1, 1, 1, 1, 1],
-        final_combiner: CombinerLiteral = "SmoothMax",
-        final_combiner_args: dict = {"alpha": -5},
-        final_combiner_weights: list = [1, 1, 0.5],
         backend_args: dict = {},
     ) -> None:
         self.action_mode = action_mode
@@ -130,23 +91,35 @@ class TransverseTuning(gym.Env):
         if unidirectional_quads:
             self._magnet_space = spaces.Box(
                 low=np.array(
-                    [0, -max_quad_setting, -6.1782e-3, 0, -6.1782e-3], dtype=np.float32
+                    [
+                        0,
+                        -max_quad_setting,
+                        -max_steerer_setting,
+                        0,
+                        -max_steerer_setting,
+                    ],
+                    dtype=np.float32,
                 ),
                 high=np.array(
-                    [max_quad_setting, 0, 6.1782e-3, max_quad_setting, 6.1782e-3],
+                    [
+                        max_quad_setting,
+                        0,
+                        max_steerer_setting,
+                        max_quad_setting,
+                        max_steerer_setting,
+                    ],
                     dtype=np.float32,
                 ),
             )
         else:
-            # TODO Have max_quad_setting but don't limit to it
             self._magnet_space = spaces.Box(
                 low=np.array(
                     [
                         -max_quad_setting,
                         -max_quad_setting,
-                        -6.1782e-3,
+                        -max_steerer_setting,
                         -max_quad_setting,
-                        -6.1782e-3,
+                        -max_steerer_setting,
                     ],
                     dtype=np.float32,
                 ),
@@ -154,9 +127,9 @@ class TransverseTuning(gym.Env):
                     [
                         max_quad_setting,
                         max_quad_setting,
-                        6.1782e-3,
+                        max_steerer_setting,
                         max_quad_setting,
-                        6.1782e-3,
+                        max_steerer_setting,
                     ],
                     dtype=np.float32,
                 ),
@@ -166,10 +139,8 @@ class TransverseTuning(gym.Env):
         self.observation_space = spaces.Dict(
             {
                 "beam": spaces.Box(
-                    # low=np.array([-np.inf, 0, -np.inf, 0], dtype=np.float32),
-                    # high=np.array([np.inf, np.inf, np.inf, np.inf], dtype=np.float32),
-                    low=np.array([-5e-3, 0, -5e-3, 0], dtype=np.float32),
-                    high=np.array([5e-3, 5e-3, 5e-3, 5e-3], dtype=np.float32),
+                    low=np.array([-np.inf, 0, -np.inf, 0], dtype=np.float32),
+                    high=np.array([np.inf, np.inf, np.inf, np.inf], dtype=np.float32),
                 ),
                 "magnets": self._magnet_space,
                 "target": spaces.Box(
@@ -206,33 +177,9 @@ class TransverseTuning(gym.Env):
                 ),
             )
 
-        # Setup reward computation
-        beam_param_transform_cls = getattr(transforms, beam_param_transform)
-        beam_param_combiner_cls = getattr(combiners, beam_param_combiner)
-        magnet_change_transform_cls = getattr(transforms, magnet_change_transform)
-        magnet_change_combiner_cls = getattr(combiners, magnet_change_combiner)
-        final_combiner_cls = getattr(combiners, final_combiner)
-
-        self._abs_transform = transforms.Abs()
-        self._beam_param_transform = beam_param_transform_cls(good=0.0, bad=4e-3)
-        self._beam_param_combiner = beam_param_combiner_cls(**beam_param_combiner_args)
-        self._magnet_change_transform = magnet_change_transform_cls(good=0.0, bad=1.0)
-        self._magnet_change_combiner = magnet_change_combiner_cls(
-            **magnet_change_combiner_args
-        )
-        self._final_combiner = final_combiner_cls(**final_combiner_args)
-
-        self._beam_param_combiner_weights = beam_param_combiner_weights
-        self._magnet_change_combiner_weights = magnet_change_combiner_weights
-        self._final_combiner_weights = final_combiner_weights
-
         # Setup particle simulation or control system backend
         if backend == "cheetah":
             self.backend = CheetahBackend(**backend_args)
-        elif backend == "doocs_dummy":
-            self.backend = DOOCSBackend(use_dummy=True, **backend_args)
-        elif backend == "doocs":
-            self.backend = DOOCSBackend(use_dummy=False, **backend_args)
         else:
             raise ValueError(f'Invalid value "{backend}" for backend')
 
@@ -286,7 +233,7 @@ class TransverseTuning(gym.Env):
         return observation, info
 
     def step(self, action):
-        self._take_action(action)  # TODO Clip magnets settings
+        self._take_action(action)
 
         self.backend.update()  # Run the simulation
 
@@ -359,6 +306,7 @@ class TransverseTuning(gym.Env):
             "beam_reward": self._beam_reward,
             "on_screen_reward": self._on_screen_reward,
             "magnet_change_reward": self._magnet_change_reward,
+            "max_quad_setting": self.observation_space["magnets"].high[0],
             "backend_info": self.backend.get_info(),  # Info specific to the backend
         }
 
@@ -388,29 +336,29 @@ class TransverseTuning(gym.Env):
         )
 
     def _get_reward(self) -> float:
-        current_beam = self.backend.get_beam_parameters()
-        target_beam = self._target_beam
-        is_beam_on_screen = self.backend.is_beam_on_screen()
-        magnet_changes = (
-            self.backend.get_magnets() - self._previous_magnet_settings
-        ) / np.maximum(
-            np.abs(self.observation_space["magnets"].low),
-            np.abs(self.observation_space["magnets"].high),
-        )
+        """
+        vvvvvvvvvvv YOU MAY MODIFY THIS METHOD TO IMPLEMENT YOUR OWN REWARD. vvvvvvvvvvv
 
-        self._beam_reward = self._beam_param_combiner(
-            self._beam_param_transform(self._abs_transform(current_beam - target_beam)),
-            weights=self._beam_param_combiner_weights,
-        )
-        self._on_screen_reward = 1.0 if is_beam_on_screen else 0.0
-        self._magnet_change_reward = self._magnet_change_combiner(
-            self._magnet_change_transform(self._abs_transform(magnet_changes)),
-            weights=self._magnet_change_combiner_weights,
-        )
-        reward = self._final_combiner(
-            [self._beam_reward, self._on_screen_reward, self._magnet_change_reward],
-            weights=self._final_combiner_weights,
-        )
+        Computes the reward for the current step.
+
+        You can make use of the following information to compute the reward:
+         - self.backend.get_beam_parameters(): Returns a NumPy array with the current
+              beam parameters (mu_x, sigma_x, mu_y, sigma_y).
+            - self._target_beam: NumPy array with the target beam parameters (mu_x,
+                sigma_x, mu_y, sigma_y).
+            - self.backend.is_beam_on_screen(): Boolean indicating whether the beam is
+                on the screen.
+            - self.backend.get_magnets(): NumPy array with the current magnet settings
+                as (k1_Q1, k1_Q2, angle_CV, k1_Q3, angle_CH).
+            - self._previous_magnet_settings: NumPy array with the magnet settings
+                before the current action was taken as (k1_Q1, k1_Q2, angle_CV, k1_Q3,
+                angle_CH).
+
+        You are allowed to make use of any other information available in the
+        environment and backend, if you are so inclined to look through the code.
+        """
+
+        reward = 1.0  # Default reward
 
         return reward
 
@@ -494,7 +442,7 @@ class CheetahBackend(TransverseTuningBaseBackend):
         false false beam parameters are returned when the beam is not on the screen.
         The false beam parameters are estimates of what would be measured on the real
         screen as a result of the camera vignetting when no beam is visible. NOTE that
-        these fasle beam parameters would always be returned and therefore also be used
+        these false beam parameters would always be returned and therefore also be used
         for the reward computation.
     """
 
@@ -527,14 +475,9 @@ class CheetahBackend(TransverseTuningBaseBackend):
         self.simulate_finite_screen = simulate_finite_screen
 
         # Simulation setup
-        # the lattice json file is in the same directory as this file
         self.segment = cheetah.Segment.from_lattice_json(
-            os.path.join(os.path.dirname(__file__), "ARES_EA_Cheetah_Lattice.json")
+            Path(__file__).parent / "ea.json"
         )
-
-        self.segment.AREABSCR1.resolution = torch.tensor((2448, 2040))
-        self.segment.AREABSCR1.pixel_size = torch.tensor((3.3198e-6, 2.4469e-6))
-        self.segment.AREABSCR1.binning = torch.tensor(1)
         self.segment.AREABSCR1.is_active = True
 
         # Spaces for domain randomisation
@@ -603,17 +546,18 @@ class CheetahBackend(TransverseTuningBaseBackend):
             incoming_parameters = self.incoming_beam_space.sample()
 
         self.incoming = cheetah.ParameterBeam.from_parameters(
-            energy=torch.tensor(incoming_parameters[0], dtype=torch.float32),
-            mu_x=torch.tensor(incoming_parameters[1], dtype=torch.float32),
-            mu_xp=torch.tensor(incoming_parameters[2], dtype=torch.float32),
-            mu_y=torch.tensor(incoming_parameters[3], dtype=torch.float32),
-            mu_yp=torch.tensor(incoming_parameters[4], dtype=torch.float32),
-            sigma_x=torch.tensor(incoming_parameters[5], dtype=torch.float32),
-            sigma_xp=torch.tensor(incoming_parameters[6], dtype=torch.float32),
-            sigma_y=torch.tensor(incoming_parameters[7], dtype=torch.float32),
-            sigma_yp=torch.tensor(incoming_parameters[8], dtype=torch.float32),
-            sigma_s=torch.tensor(incoming_parameters[9], dtype=torch.float32),
-            sigma_p=torch.tensor(incoming_parameters[10], dtype=torch.float32),
+            energy=torch.tensor(incoming_parameters[0]),
+            mu_x=torch.tensor(incoming_parameters[1]),
+            mu_px=torch.tensor(incoming_parameters[2]),
+            mu_y=torch.tensor(incoming_parameters[3]),
+            mu_py=torch.tensor(incoming_parameters[4]),
+            sigma_x=torch.tensor(incoming_parameters[5]),
+            sigma_px=torch.tensor(incoming_parameters[6]),
+            sigma_y=torch.tensor(incoming_parameters[7]),
+            sigma_py=torch.tensor(incoming_parameters[8]),
+            sigma_tau=torch.tensor(incoming_parameters[9]),
+            sigma_p=torch.tensor(incoming_parameters[10]),
+            dtype=torch.float32,
         )
 
         # Set up misalignments
@@ -624,10 +568,18 @@ class CheetahBackend(TransverseTuningBaseBackend):
         elif self.misalignment_mode == "random":
             misalignments = self.misalignment_space.sample()
 
-        self.segment.AREAMQZM1.misalignment = torch.as_tensor(misalignments[0:2])
-        self.segment.AREAMQZM2.misalignment = torch.as_tensor(misalignments[2:4])
-        self.segment.AREAMQZM3.misalignment = torch.as_tensor(misalignments[4:6])
-        self.segment.AREABSCR1.misalignment = torch.as_tensor(misalignments[6:8])
+        self.segment.AREAMQZM1.misalignment = torch.tensor(
+            misalignments[0:2], dtype=torch.float32
+        )
+        self.segment.AREAMQZM2.misalignment = torch.tensor(
+            misalignments[2:4], dtype=torch.float32
+        )
+        self.segment.AREAMQZM3.misalignment = torch.tensor(
+            misalignments[4:6], dtype=torch.float32
+        )
+        self.segment.AREABSCR1.misalignment = torch.tensor(
+            misalignments[6:8], dtype=torch.float32
+        )
 
     def _preprocess_reset_options(self, options: dict) -> dict:
         """
@@ -661,14 +613,14 @@ class CheetahBackend(TransverseTuningBaseBackend):
             [
                 self.incoming.energy,
                 self.incoming.mu_x,
-                self.incoming.mu_xp,
+                self.incoming.mu_px,
                 self.incoming.mu_y,
-                self.incoming.mu_yp,
+                self.incoming.mu_py,
                 self.incoming.sigma_x,
-                self.incoming.sigma_xp,
+                self.incoming.sigma_px,
                 self.incoming.sigma_y,
-                self.incoming.sigma_yp,
-                self.incoming.sigma_s,
+                self.incoming.sigma_py,
+                self.incoming.sigma_tau,
                 self.incoming.sigma_p,
             ]
         )
@@ -709,347 +661,5 @@ class CheetahBackend(TransverseTuningBaseBackend):
         }
         if self.generate_screen_images:
             info["screen_image"] = self.get_screen_image()
-
-        return info
-
-
-class DOOCSBackend(TransverseTuningBaseBackend):
-    """
-    Backend for the ARES EA to communicate with the real accelerator through the DOOCS
-    control system.
-
-    :param use_dummy: If `True`, a dummy backend is used that does not require a
-        connection to the real accelerator.
-    """
-
-    screen_channel = "SINBAD.DIAG/CAMERA/AR.EA.BSC.R.1"
-    magnet_channels = [
-        "SINBAD.MAGNETS/MAGNET.ML/AREAMQZM1/STRENGTH",
-        "SINBAD.MAGNETS/MAGNET.ML/AREAMQZM2/STRENGTH",
-        "SINBAD.MAGNETS/MAGNET.ML/AREAMCVM1/KICK",
-        "SINBAD.MAGNETS/MAGNET.ML/AREAMQZM3/STRENGTH",
-        "SINBAD.MAGNETS/MAGNET.ML/AREAMCHM1/KICK",
-    ]
-
-    def __init__(self, use_dummy: bool) -> None:
-        # Dynamic import for module only required by this backend
-        global pydoocs
-        if use_dummy:
-            import dummypydoocs as pydoocs
-        else:
-            import pydoocs  # type: ignore
-
-        self.beam_parameter_compute_failed = {"x": False, "y": False}
-        self.reset_accelerator_was_just_called = False
-
-    def is_beam_on_screen(self) -> bool:
-        return not all(self.beam_parameter_compute_failed.values())
-
-    def get_magnets(self) -> np.ndarray:
-        return np.array(
-            [
-                pydoocs.read(f"{magnet_channel}.RBV")["data"]
-                for magnet_channel in self.magnet_channels
-            ]
-        )
-
-    def set_magnets(self, values: Union[np.ndarray, list]) -> None:
-        with ThreadPoolExecutor(max_workers=len(self.magnet_channels)) as executor:
-            for result in executor.map(self.set_magnet, self.magnet_channels, values):
-                x = result  # noqa: F841
-
-    def set_magnet(self, channel: str, value: float) -> None:
-        """
-        Set the value of a certain magnet. Returns only when the magnet has arrived at
-        the set point.
-        """
-        setpoint_channel = channel + ".SP"
-        busy_channel = channel.replace("STRENGTH", "BUSY").replace("KICK", "BUSY")
-        ps_on_channel = channel.replace("STRENGTH", "PS_ON").replace("KICK", "PS_ON")
-
-        pydoocs.write(setpoint_channel, value)
-        time_of_write = datetime.now()
-
-        time.sleep(3.0)  # Give magnets time to receive the command
-
-        seconds_before_reanimation = 60
-        is_busy = True
-        is_ps_on = False
-        while is_busy or not is_ps_on:
-            is_busy = pydoocs.read(busy_channel)["data"]
-            is_ps_on = pydoocs.read(ps_on_channel)["data"]
-
-            time.sleep(0.1)
-
-            # If the magnet is not responding, "wiggle" it back to life
-            if datetime.now() - time_of_write > timedelta(
-                seconds=seconds_before_reanimation
-            ):
-                # Don't wiggle steerers, just quadrupoles
-                if "KICK" in channel:
-                    continue
-
-                self.try_to_reanimate_quadrupole(channel, value)
-
-                time_of_write = datetime.now()  # Reset time of write
-                seconds_before_reanimation = seconds_before_reanimation * 2
-
-    def try_to_reanimate_quadrupole(self, channel: str, value: float) -> None:
-        """
-        The quadrupole magnets at ARES can freeze under certain conditions. This
-        function attempts to unfreeze a quadrupole by first turning its power supply off
-        and on again and then wiggling the setpoint up and down by 0.2 (k1).
-        """
-        setpoint_channel = channel + ".SP"
-        readback_channel = channel + ".RBV"
-        ps_on_channel = channel.replace("STRENGTH", "PS_ON").replace("KICK", "PS_ON")
-        busy_channel = channel.replace("STRENGTH", "BUSY").replace("KICK", "BUSY")
-
-        print(f"WARNING {datetime.now()}: Trying to reanimate {channel}.")
-
-        # Turn off and on again (yes ... turn it off when it is off ...)
-        print(f"    -> Truning off ({ps_on_channel} / {datetime.now()})")
-        pydoocs.write(ps_on_channel, 0)
-        is_ps_on = True
-        readback = pydoocs.read(readback_channel)["data"]
-        last_turn_off_time = datetime.now()
-        while is_ps_on or np.abs(readback) > 0.3:
-            time.sleep(0.3)
-            is_ps_on = pydoocs.read(ps_on_channel)["data"]
-            readback = pydoocs.read(readback_channel)["data"]
-            if datetime.now() - last_turn_off_time > timedelta(seconds=120):
-                print(f"        -> Trying to turn off AGAIN ({datetime.now()})")
-                pydoocs.write(ps_on_channel, 0)
-                last_turn_off_time = datetime.now()
-        time.sleep(4.0)
-
-        print(f"    -> Setpoint to 0.0 ({setpoint_channel} / {datetime.now()})")
-        pydoocs.write(setpoint_channel, 0.0)
-        time.sleep(10.0)
-
-        print(f"    -> Turning back on ({ps_on_channel} / {datetime.now()})")
-        pydoocs.write(ps_on_channel, 1)
-        is_ps_on = False
-        last_turn_on_time = datetime.now()
-        while not is_ps_on:
-            time.sleep(0.3)
-            is_ps_on = pydoocs.read(ps_on_channel)["data"]
-            if datetime.now() - last_turn_on_time > timedelta(seconds=60):
-                print(f"        -> Trying to turn on AGAIN ({datetime.now()})")
-                pydoocs.write(ps_on_channel, 1)
-                last_turn_on_time = datetime.now()
-        time.sleep(4.0)
-
-        wiggle_value = value + np.sign(value) * 35.0
-        print(
-            f"    -> Wiggling to value {wiggle_value} ({setpoint_channel} /"
-            f" {datetime.now()})"
-        )
-        pydoocs.write(setpoint_channel, wiggle_value)
-        is_busy = True
-        while is_busy:  # or not is_idle or not is_close:
-            is_busy = pydoocs.read(busy_channel)["data"]
-
-            time.sleep(0.5)
-
-        print(
-            f"    -> Returning from wiggle to {value} ({setpoint_channel} /"
-            f" {datetime.now()})"
-        )
-        pydoocs.write(setpoint_channel, value)
-        time.sleep(10.0)
-
-    def reset(self, options=None) -> None:
-        preprocessed_options = self._preprocess_reset_options(options)  # noqa: F841
-
-        self.update()
-
-        self.magnets_before_reset = self.get_magnets()
-        self.screen_before_reset = self.get_screen_image()
-        self.beam_before_reset = self.get_beam_parameters()
-
-        # In order to record a screen image right after the accelerator was reset, this
-        # flag is set so that we know to record the image the next time
-        # `update_accelerator` is called.
-        self.reset_accelerator_was_just_called = True
-
-    def _preprocess_reset_options(self, options: dict) -> dict:
-        """
-        Check that only valid options are passed and make it a dict if None was passed.
-        """
-        if options is None:
-            return {}
-
-        valid_options = ["incoming", "misalignments"]
-        for option in options:
-            assert option in valid_options
-
-        return options
-
-    def update(self):
-        self.screen_image = self.capture_clean_screen_image()
-
-        # Record the beam image just after reset (because there is no info on reset).
-        # It will be included in `info` of the next step.
-        if self.reset_accelerator_was_just_called:
-            self.screen_after_reset = self.screen_image
-            self.reset_accelerator_was_just_called = False
-
-    def get_beam_parameters(self):
-        img = self.get_screen_image()
-        pixel_size = self.get_pixel_size()
-        resolution = self.get_screen_resolution()
-
-        parameters = {}
-        for axis, direction in zip([0, 1], ["x", "y"]):
-            projection = img.sum(axis=axis)
-            minfiltered = minimum_filter1d(projection, size=5, mode="nearest")
-            filtered = uniform_filter1d(
-                minfiltered, size=5, mode="nearest"
-            )  # TODO rethink filters
-
-            (half_values,) = np.where(filtered >= 0.5 * filtered.max())
-
-            if len(half_values) > 0:
-                fwhm_pixel = half_values[-1] - half_values[0]
-                center_pixel = half_values[0] + fwhm_pixel / 2
-
-                # If (almost) all pixels are in FWHM, the beam might not be on screen
-                self.beam_parameter_compute_failed[direction] = (
-                    len(half_values) > 0.95 * resolution[axis]
-                )
-            else:
-                fwhm_pixel = 42  # TODO figure out what to do with these
-                center_pixel = 42
-
-            parameters[f"mu_{direction}"] = (
-                center_pixel - len(filtered) / 2
-            ) * pixel_size[axis]
-            parameters[f"sigma_{direction}"] = fwhm_pixel / 2.355 * pixel_size[axis]
-
-        parameters["mu_y"] = -parameters["mu_y"]
-
-        return np.array(
-            [
-                parameters["mu_x"],
-                parameters["sigma_x"],
-                parameters["mu_y"],
-                parameters["sigma_y"],
-            ]
-        )
-
-    def get_screen_image(self):
-        return self.screen_image
-
-    def get_binning(self):
-        horizontal_binning_channel = self.screen_channel + "/BINNINGHORIZONTAL"
-        vertical_binning_channel = self.screen_channel + "/BINNINGVERTICAL"
-        return np.array(
-            [
-                pydoocs.read(horizontal_binning_channel)["data"],
-                pydoocs.read(vertical_binning_channel)["data"],
-            ]
-        )
-
-    def get_screen_resolution(self):
-        width_channel = self.screen_channel + "/WIDTH"
-        height_channel = self.screen_channel + "/HEIGHT"
-        return np.array(
-            [pydoocs.read(width_channel)["data"], pydoocs.read(height_channel)["data"]]
-        )
-
-    def get_pixel_size(self):
-        x_pixel_size_channel = self.screen_channel + "/X.POLY_SCALE"
-        y_pixel_size_channel = self.screen_channel + "/Y.POLY_SCALE"
-        return (
-            np.array(
-                [
-                    abs(pydoocs.read(x_pixel_size_channel)["data"][2]) / 1000,
-                    abs(pydoocs.read(y_pixel_size_channel)["data"][2]) / 1000,
-                ]
-            )
-            * self.get_binning()
-        )
-
-    def capture_clean_screen_image(self, average=5):
-        """
-        Capture a clean image of the beam from the screen using `average` images with
-        beam on and `average` images of the background and then removing the background.
-
-        Saves the image to a property of the object.
-        """
-        # Laser off
-        self.set_cathode_laser(False)
-        background_images = self.capture_interval(n=average, dt=0.1)
-        median_background = np.median(background_images.astype("float64"), axis=0)
-
-        # Laser on
-        self.set_cathode_laser(True)
-        screen_images = self.capture_interval(n=average, dt=0.1)
-        median_beam = np.median(screen_images.astype("float64"), axis=0)
-
-        removed = (median_beam - median_background).clip(0, 2**16 - 1)
-        flipped = np.flipud(removed)
-
-        return flipped.astype(np.uint16)
-
-    def capture_interval(self, n, dt):
-        """Capture `n` images from the screen and wait `dt` seconds in between them."""
-        images = []
-        for _ in range(n):
-            images.append(self.capture_screen())
-            time.sleep(dt)
-        return np.array(images)
-
-    def capture_screen(self):
-        """Capture and image from the screen."""
-        screen_image_channel = self.screen_channel + "/IMAGE_EXT_ZMQ"
-        return pydoocs.read(screen_image_channel)["data"]
-
-    def set_cathode_laser(self, setto: bool) -> None:
-        """
-        Sets the bool switch of the cathode laser event to `setto` and waits a second.
-        """
-        address = "SINBAD.DIAG/TIMER.CENTRAL/MASTER/EVENT5"
-        bits = pydoocs.read(address)["data"]
-        bits[0] = 1 if setto else 0
-        pydoocs.write(address, bits)
-        time.sleep(1)
-
-    def get_info(self) -> dict:
-        # If magnets or the beam were recorded before reset, add them info on the first
-        # step, so a generalised data recording wrapper captures them.
-        info = {}
-
-        # Screen image
-        info["screen_image"] = self.get_screen_image()
-
-        if hasattr(self, "magnets_before_reset"):
-            info["magnets_before_reset"] = self.magnets_before_reset
-            del self.magnets_before_reset
-        if hasattr(self, "screen_before_reset"):
-            info["screen_before_reset"] = self.screen_before_reset
-            del self.screen_before_reset
-        if hasattr(self, "beam_before_reset"):
-            info["beam_before_reset"] = self.beam_before_reset
-            del self.beam_before_reset
-
-        if hasattr(self, "screen_after_reset"):
-            info["screen_after_reset"] = self.screen_after_reset
-            del self.screen_after_reset
-
-        # Gain of camera for AREABSCR1
-        camera_gain_channel = self.screen_channel + "/GAINRAW"
-        info["camera_gain"] = pydoocs.read(camera_gain_channel)["data"]
-
-        # Steerers upstream of Experimental Area
-        for steerer in ["ARLIMCHM1", "ARLIMCVM1", "ARLIMCHM2", "ARLIMCVM2"]:
-            response = pydoocs.read(f"SINBAD.MAGNETS/MAGNET.ML/{steerer}/KICK.RBV")
-            info[steerer] = response["data"]
-
-        # Gun solenoid
-        info["gun_solenoid"] = pydoocs.read(
-            "SINBAD.MAGNETS/MAGNET.ML/ARLIMSOG1+-/FIELD.RBV"
-        )["data"]
 
         return info

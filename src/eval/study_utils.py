@@ -206,6 +206,7 @@ def plot_final_mae_box(
     studies: list[Study],
     title: Optional[str] = "Final MAEs",
     palette: Optional[Any] = None,
+    saturation: float = 0.75,
     figsize: tuple[float, float] = (5, 3),
     ax: Optional[matplotlib.axes.Axes] = None,
     save_path: Optional[str] = None,
@@ -234,6 +235,7 @@ def plot_final_mae_box(
         y=combined_names,
         hue=combined_names,
         palette=palette,
+        saturation=saturation,
         ax=ax,
     )
     ax.set_xscale("log")
@@ -463,6 +465,7 @@ def plot_rmse_box(
     studies: list[Study],
     title: Optional[str] = "RMSEs",
     palette: Optional[Any] = None,
+    saturation: float = 0.75,
     figsize: tuple[float, float] = (5, 3),
     ax: Optional[matplotlib.axes.Axes] = None,
     save_path: Optional[str] = None,
@@ -491,6 +494,7 @@ def plot_rmse_box(
         y=combined_names,
         hue=combined_names,
         palette=palette,
+        saturation=saturation,
         ax=ax,
     )
     ax.set_xscale("log")

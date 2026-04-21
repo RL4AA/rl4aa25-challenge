@@ -5,7 +5,7 @@ import pytest
 from gymnasium.wrappers import RescaleAction
 from stable_baselines3.common.env_checker import check_env
 
-from src.environments import ea
+from src.environments import bc, dl, ea, sh
 from src.reward import combiners, transforms
 
 
@@ -13,6 +13,9 @@ from src.reward import combiners, transforms
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_check_env_cheetah(section):
@@ -22,11 +25,27 @@ def test_check_env_cheetah(section):
     check_env(env)
 
 
+@pytest.mark.ocelot
+@pytest.mark.ea
+def test_check_env_ocelot():
+    """
+    Test SB3's `check_env` on all environments using their Ocelot backends.
+
+    NOTE Only the EA environment currently has an Ocelot backend.
+    """
+    env = ea.TransverseTuning(backend="ocelot")
+    env = RescaleAction(env, -1, 1)  # Prevents SB3 action space scale warning
+    check_env(env)
+
+
 @pytest.mark.doocs
 @pytest.mark.parametrize(
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_check_env_doocs(section):
@@ -40,6 +59,9 @@ def test_check_env_doocs(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_mandatory_backend_argument(section):
@@ -54,6 +76,9 @@ def test_mandatory_backend_argument(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_passing_backend_args(section):
@@ -75,7 +100,7 @@ def test_passing_backend_args(section):
             1e-3,
         ]
     )
-    if section in [ea]:  # EA and BC with 3 quadrupoles + screen
+    if section in [ea, bc]:  # EA and BC with 3 quadrupoles + screen
         misalignment_mode = np.array([-1e-4, 1e-4, -1e-5, 1e-5, 3e-4, 0, -3e-4, 9e-5])
     else:  # DL and SH with 2 quadrupoles + screen
         misalignment_mode = np.array([-1e-4, 1e-4, -1e-5, 1e-5, -3e-4, 9e-5])
@@ -122,6 +147,9 @@ def test_passing_backend_args(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_public_members(section):
@@ -177,7 +205,7 @@ def test_same_members():
     Test that all environment classes have the same members. This should give at least
     some indication, when one implementation differs in priciple from the others.
     """
-    sections = [ea]
+    sections = [ea, dl, bc, sh]
 
     members = []
     for section in sections:
@@ -196,7 +224,7 @@ def test_same_argspec():
     To make sure that all four section environments are implemented in the same way,
     test that their `__init__` methods have the same arguments.
     """
-    sections = [ea]
+    sections = [ea, dl, bc, sh]
 
     argspecs = [
         inspect.getfullargspec(section.TransverseTuning) for section in sections
@@ -212,6 +240,9 @@ def test_same_argspec():
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 @pytest.mark.skip(reason="Random seeds are not fixed yet")
@@ -241,6 +272,9 @@ def test_seed(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_doocs_before_reset_infos(section):
@@ -267,6 +301,9 @@ def test_doocs_before_reset_infos(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_doocs_before_reset_infos_disappear(section):
@@ -289,6 +326,9 @@ def test_doocs_before_reset_infos_disappear(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_transform_combiner_passing(section):
@@ -337,6 +377,9 @@ def test_transform_combiner_passing(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_magnet_clipping_direct(section):
@@ -363,6 +406,9 @@ def test_magnet_clipping_direct(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_magnet_clipping_delta(section):
@@ -389,6 +435,9 @@ def test_magnet_clipping_delta(section):
     "section, settings",
     [
         pytest.param(ea, [1.0, 2.0, 1e-3, 3.0, 2e-3], marks=pytest.mark.ea),
+        pytest.param(dl, [1e-3, 2e-3, 1.0, 2.0], marks=pytest.mark.dl),
+        pytest.param(bc, [1.0, 2.0, 1e-3, 2e-3, 3.0], marks=pytest.mark.bc),
+        pytest.param(sh, [1e-3, 1.0, 2e-3, 2.0], marks=pytest.mark.sh),
     ],
 )
 def test_fixed_magnet_init_mode_array(section, settings):
@@ -412,6 +461,9 @@ def test_fixed_magnet_init_mode_array(section, settings):
     "section, settings",
     [
         pytest.param(ea, [1.0, 2.0, 1e-3, 3.0, 2e-3], marks=pytest.mark.ea),
+        pytest.param(dl, [1e-3, 2e-3, 1.0, 2.0], marks=pytest.mark.dl),
+        pytest.param(bc, [1.0, 2.0, 1e-3, 2e-3, 3.0], marks=pytest.mark.bc),
+        pytest.param(sh, [1e-3, 1.0, 2e-3, 2.0], marks=pytest.mark.sh),
     ],
 )
 def test_fixed_magnet_init_mode_list(section, settings):
@@ -433,6 +485,9 @@ def test_fixed_magnet_init_mode_list(section, settings):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_fixed_target_beam_mode_array(section):
@@ -458,6 +513,9 @@ def test_fixed_target_beam_mode_array(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_fixed_target_beam_mode_list(section):
@@ -481,6 +539,9 @@ def test_fixed_target_beam_mode_list(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_fixed_target_threshold_array(section):
@@ -506,6 +567,9 @@ def test_fixed_target_threshold_array(section):
     "section",
     [
         pytest.param(ea, marks=pytest.mark.ea),
+        pytest.param(dl, marks=pytest.mark.dl),
+        pytest.param(bc, marks=pytest.mark.bc),
+        pytest.param(sh, marks=pytest.mark.sh),
     ],
 )
 def test_fixed_target_threshold_list(section):

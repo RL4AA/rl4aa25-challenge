@@ -3,50 +3,8 @@ import pytest
 
 from src.environments import ea
 
-# TODO Test members for both env and backends should check after reset and step
 
-
-def test_same_members_cheetah():
-    """
-    Test that all backend classes have the same members. This should give at least some
-    indication, when one implementation differs in priciple from the others.
-    """
-    sections = [ea]
-
-    members = []
-    for section in sections:
-        env = section.TransverseTuning(backend="cheetah")
-        members.append(dir(env))
-
-    for member in members[0]:
-        for other_members in members[1:]:
-            assert member in other_members
-
-
-@pytest.mark.doocs
-def test_same_members_doocs():
-    """
-    Test that all backend classes have the same members. This should give at least some
-    indication, when one implementation differs in priciple from the others.
-    """
-    sections = [ea]
-
-    members = []
-    for section in sections:
-        env = section.TransverseTuning(backend="doocs_dummy")
-        members.append(dir(env))
-
-    for member in members[0]:
-        for other_members in members[1:]:
-            assert member in other_members
-
-
-@pytest.mark.parametrize(
-    "section",
-    [
-        pytest.param(ea, marks=pytest.mark.ea),
-    ],
-)
+@pytest.mark.parametrize("section", [pytest.param(ea, marks=pytest.mark.ea)])
 @pytest.mark.skip(reason="Random seeds are not fixed yet")
 def test_seed(section):
     """
@@ -71,10 +29,7 @@ def test_seed(section):
 
 
 @pytest.mark.parametrize(
-    "section, misalignments",
-    [
-        pytest.param(ea, np.zeros(8), marks=pytest.mark.ea),
-    ],
+    "section, misalignments", [pytest.param(ea, np.zeros(8), marks=pytest.mark.ea)]
 )
 def test_cheetah_fixed_incoming_mode_array_list(section, misalignments):
     """
